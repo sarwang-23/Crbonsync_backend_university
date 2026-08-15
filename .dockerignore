@@ -1,0 +1,11 @@
+node_modules
+dist
+src/generated
+.env
+.git
+.gitignore
+.github
+tests
+jest.config.js
+coverage
+*.md

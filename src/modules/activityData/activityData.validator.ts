@@ -20,7 +20,7 @@ const scope2Categories = [
   "PURCHASED_COOLING"
 ];
 
-export const createActivityDataSchema = z.object({
+const baseActivityDataSchema = z.object({
   universityId: z.string().uuid(),
   reportingPeriodId: z.string().uuid(),
   campusId: z.string().uuid().optional(),
@@ -35,7 +35,9 @@ export const createActivityDataSchema = z.object({
   
   activityDate: z.coerce.date(),
   description: z.string().optional()
-}).refine(data => {
+});
+
+export const createActivityDataSchema = baseActivityDataSchema.refine(data => {
   if (data.scope === "SCOPE_1" && !scope1Categories.includes(data.category)) {
     return false;
   }
@@ -48,7 +50,7 @@ export const createActivityDataSchema = z.object({
   path: ["category"]
 });
 
-export const updateActivityDataSchema = createActivityDataSchema.partial().omit({
+export const updateActivityDataSchema = baseActivityDataSchema.partial().omit({
   universityId: true,
   reportingPeriodId: true
 });

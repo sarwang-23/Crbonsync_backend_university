@@ -1,12 +1,14 @@
 import { Router } from "express";
 import { generate, generatePdf, list, getSingle, download } from "./reports.controller";
+import { validateRequest } from "../../middleware/validate.middleware";
+import { generateReportSchema, getReportsSchema, reportIdParamSchema } from "./reports.validator";
 
 const reportsRouter = Router();
 
-reportsRouter.post("/generate", generate);
-reportsRouter.post("/:id/generate-pdf", generatePdf);
-reportsRouter.get("/", list);
-reportsRouter.get("/:id", getSingle);
-reportsRouter.get("/:id/download", download);
+reportsRouter.post("/generate", validateRequest(generateReportSchema, "body"), generate);
+reportsRouter.post("/:id/generate-pdf", validateRequest(reportIdParamSchema, "params"), generatePdf);
+reportsRouter.get("/", validateRequest(getReportsSchema, "query"), list);
+reportsRouter.get("/:id", validateRequest(reportIdParamSchema, "params"), getSingle);
+reportsRouter.get("/:id/download", validateRequest(reportIdParamSchema, "params"), download);
 
 export { reportsRouter };

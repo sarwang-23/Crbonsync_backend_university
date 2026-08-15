@@ -1,5 +1,5 @@
 import { prisma } from "../../config/prisma";
-import { logEvent } from "../auditLogs/auditLogs.service";
+import { createAuditLog } from "../auditLogs/auditLogs.service";
 import { AuditAction } from "../../generated/prisma/client";
 import { getEmissionFactor } from "../emissionFactors/ef.resolver";
 import { convertToEmissionFactorUnit, getCo2eMultiplier } from "./unitConversion";
@@ -97,39 +97,40 @@ export const calculateActivity = async (activityId: string) => {
       status: "CALCULATED",
     }
   });
+  const efAction = resolvedFactor.source.toLowerCase() === "climatiq" 
+    ? AuditAction.EF_RESOLVED_CLIMATIQ 
+    : AuditAction.EF_RESOLVED_FIXED;
 
-  await logEvent(
-    AuditAction.EMISSION_FACTOR_SELECTED,
-    "EmissionFactor",
-    resolvedFactor.id,
-    null,
-    activity.universityId,
-    null,
-    { factor: resolvedFactor.factor, source: resolvedFactor.source },
-    "Emission factor selected for calculation"
-  );
+  await createAuditLog({
+    action: efAction,
+    entityType: "EmissionFactor",
+    entityId: resolvedFactor.id,
+    universityId: activity.universityId,
+    metadata: { factor: resolvedFactor.factor, source: resolvedFactor.source },
+    description: `Emission factor selected (${resolvedFactor.source})`
+  });
 
-  await logEvent(
-    AuditAction.CALCULATION_CREATED,
-    "Calculation",
-    result.id,
-    null,
-    activity.universityId,
-    null,
-    { co2eKg },
-    "Calculation created"
-  );
+  await createAuditLog({
+    action: AuditAction.CALCULATION_CREATED,
+    entityType: "Calculation",
+    entityId: result.id,
+    universityId: activity.universityId,
+    metadata: { co2eKg },
+    description: "Calculation created"
+  });
+  
+  await prisma.activityData.update({
+    where: { id: activityId },
+    data: { status: "CALCULATED" }
+  });
 
-  await logEvent(
-    AuditAction.ACTIVITY_CALCULATED,
-    "ActivityData",
-    activity.id,
-    null,
-    activity.universityId,
-    null,
-    { calculationId: result.id, co2eKg },
-    "Activity data calculated"
-  );
+  await createAuditLog({
+    action: AuditAction.ACTIVITY_CALCULATED,
+    entityType: "ActivityData",
+    entityId: activity.id,
+    universityId: activity.universityId,
+    description: "Activity calculation completed"
+  });
 
   return result;
 };

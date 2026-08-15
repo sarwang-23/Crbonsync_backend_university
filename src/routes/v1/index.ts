@@ -22,6 +22,7 @@ import { activityDataRouter } from "../../modules/activityData/activityData.rout
 import { emissionFactorsRouter } from "../../modules/emissionFactors/emissionFactors.routes";
 import { calculationsRouter } from "../../modules/calculations/calculations.routes";
 import { baselinesRouter } from "../../modules/baselines/baselines.routes";
+import { importsRouter } from "../../modules/imports/imports.routes";
 import { dashboardRouter } from "../../modules/dashboard/dashboard.routes";
 import { dataQualityRouter } from "../../modules/dataQuality/dataQuality.routes";
 import { auditLogsRouter } from "../../modules/auditLogs/auditLogs.routes";
@@ -55,6 +56,7 @@ v1Router.use("/campuses", campusesRouter);
 v1Router.use("/buildings", buildingsRouter);
 v1Router.use("/floors", floorsRouter);
 v1Router.use("/assets", assetsRouter);
+v1Router.use("/imports", importsRouter);
 v1Router.use("/activity-data", activityDataRouter);
 v1Router.use("/emission-factors", emissionFactorsRouter);
 v1Router.use("/calculations", calculationsRouter);

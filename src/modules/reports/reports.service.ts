@@ -1,5 +1,5 @@
 import { prisma } from "../../config/prisma";
-import { logEvent } from "../auditLogs/auditLogs.service";
+import { createAuditLog } from "../auditLogs/auditLogs.service";
 import { AuditAction } from "../../generated/prisma/client";
 import { 
   getOverview, 
@@ -15,6 +15,7 @@ import {
 import { generatePdf } from "./reports.utils";
 import { createNotification } from "../notifications/notifications.service";
 import path from "path";
+import { uploadFile, getSignedUrl } from "../../services/storage.service";
 
 export const generateReport = async (universityId: string, reportingPeriodId: string) => {
   // 1. Check if University & RP exist
@@ -91,15 +92,25 @@ export const generateReportPdf = async (reportId: string) => {
     };
 
     const fileName = `carbon-report-${report.id}.pdf`;
-    const filePath = path.join(process.cwd(), "storage/reports", fileName);
+    
+    // Generate PDF to Buffer
+    const pdfBuffer = await generatePdf(reportData);
 
-    await generatePdf(reportData, filePath);
+    const year = new Date().getFullYear();
+    const filePath = `${universityId}/${year}/${fileName}`;
+
+    // Upload to Supabase Storage via storage.service
+    const uploadResult = await uploadFile("reports", filePath, pdfBuffer, "application/pdf");
+    const storagePath = uploadResult.path;
+
+    // Get signed URL for download
+    const publicUrl = await getSignedUrl("reports", storagePath);
 
     await prisma.report.update({
       where: { id: report.id },
       data: {
         status: "GENERATED",
-        filePath,
+        filePath: storagePath, // We reuse filePath column for storage path or add a new one if schema allows. Actually, let's just store publicUrl if possible. Assuming filePath is used to store path.
         fileName,
         totalEmissionsKg: overview.totalEmissionsTonnes * 1000,
         scope1Kg: scope.scope1.kgCO2e,
@@ -113,19 +124,16 @@ export const generateReportPdf = async (reportId: string) => {
       await createNotification(u.id, report.universityId, 'Carbon Report Generated', 'Your carbon emissions report for ' + report.reportingPeriod.name + ' has been generated successfully.', 'REPORT_GENERATED');
     }
 
-    await logEvent(
-      AuditAction.REPORT_GENERATED,
-      "Report",
-      report.id,
-      null,
-      report.universityId,
-      null,
-      { fileName, status: 'GENERATED' },
-      null,
-      null
-    );
+    await createAuditLog({
+      action: AuditAction.REPORT_GENERATED,
+      entityType: "Report",
+      entityId: report.id,
+      universityId: report.universityId,
+      metadata: { fileName, status: 'GENERATED', storagePath, publicUrl },
+      description: "Carbon report generated"
+    });
     
-    return { status: 'GENERATED', filePath, fileName };
+    return { status: 'GENERATED', storagePath, fileName, publicUrl };
   } catch (error) {
     console.error('Failed to generate report:', error);
 

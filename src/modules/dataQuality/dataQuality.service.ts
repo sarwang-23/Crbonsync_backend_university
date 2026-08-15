@@ -1,82 +1,52 @@
 import { prisma } from "../../config/prisma";
 
-export const getDataQualityOverview = async (universityId: string, reportingPeriodId?: string) => {
-  const where: any = { universityId };
-  if (reportingPeriodId) {
-    where.reportingPeriodId = reportingPeriodId;
-  }
+export const getDataQualityMetrics = async (universityId: string) => {
+  const [
+    total,
+    verified,
+    draft,
+    needsReview,
+    rejected
+  ] = await Promise.all([
+    prisma.activityData.count({ where: { universityId } }),
+    prisma.activityData.count({ where: { universityId, status: "VERIFIED" } }),
+    prisma.activityData.count({ where: { universityId, status: "DRAFT" } }),
+    prisma.activityData.count({ where: { universityId, status: "UNDER_REVIEW" } }),
+    prisma.activityData.count({ where: { universityId, status: "REJECTED" } }),
+  ]);
 
-  const activities = await prisma.activityData.findMany({
-    where,
-    include: {
-      documents: true,
+  // To find missing EF, we look for activities that are VERIFIED but have no related calculation
+  // Or calculation status = FAILED
+  const missingEF = await prisma.activityData.count({
+    where: {
+      universityId,
+      status: "VERIFIED",
+      calculations: { none: {} }
     }
   });
 
-  const totalActivities = activities.length;
-
-  const verifiedActivities = activities.filter(
-    (item) => item.status === "VERIFIED"
-  ).length;
-
-  const pendingActivities = activities.filter(
-    (item) => item.status === "SUBMITTED" || item.status === "UNDER_REVIEW"
-  ).length;
-
-  const rejectedActivities = activities.filter(
-    (item) => item.status === "REJECTED"
-  ).length;
-
-  const verificationCoverage = totalActivities > 0
-    ? (verifiedActivities / totalActivities) * 100
-    : 0;
-
-  /*
-   * Temporary completeness calculation.
-   * Later this will use expected categories for each building/floor.
-   */
-  const activityCompleteness = totalActivities > 0 ? 100 : 0;
-
-  /*
-   * Evidence calculation using exact Document relation
-   */
-  const activitiesWithEvidence = activities.filter((item) => item.documents.length > 0).length;
-  const evidenceCoverage = totalActivities > 0 
-    ? (activitiesWithEvidence / totalActivities) * 100 
-    : 0;
-
-  const overallScore =
-    activityCompleteness * 0.3 +
-    verificationCoverage * 0.3 +
-    evidenceCoverage * 0.4;
+  // To find duplicates, we can look for descriptions starting with 'POSSIBLE_DUPLICATE' 
+  // as implemented in our activityData.service.ts
+  const duplicates = await prisma.activityData.count({
+    where: {
+      universityId,
+      description: {
+        startsWith: "POSSIBLE_DUPLICATE"
+      }
+    }
+  });
 
   return {
-    overallScore: Number(overallScore.toFixed(2)),
-    activityCompleteness: Number(activityCompleteness.toFixed(2)),
-    evidenceCoverage: Number(evidenceCoverage.toFixed(2)),
-    verificationCoverage: Number(verificationCoverage.toFixed(2)),
-    totalActivities,
-    verifiedActivities,
-    pendingActivities,
-    rejectedActivities,
-    missingDataCount: 2, // Dummy count based on missing data api
+    total,
+    verified,
+    draft,
+    needsReview,
+    rejected,
+    missingEF,
+    duplicates
   };
 };
 
-export const getMissingData = async (universityId: string, reportingPeriodId?: string) => {
-  // Temporary hardcoded logic as requested in 14.10 for the UI
-  return [
-    {
-      building: "Academic Block",
-      floor: "Floor 2",
-      category: "REFRIGERANT",
-      status: "MISSING"
-    },
-    {
-      building: "Hostel Block",
-      floor: "Floor 1",
-      category: "DIESEL",
-      status: "MISSING"
-    }
-  ];
+export const getDataQualityOverview = async (universityId: string, _reportingPeriodId?: string) => {
+  return getDataQualityMetrics(universityId);
 };

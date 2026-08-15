@@ -8,6 +8,8 @@ export const uploadDocument = async (
     fileUrl: string;
     mimeType: string;
     fileSize: number;
+    storagePath?: string;
+    publicUrl?: string;
   },
   metadata: CreateDocumentInput,
   userId?: string
@@ -36,10 +38,13 @@ export const uploadDocument = async (
       fileName: fileData.fileName,
       originalName: fileData.originalName,
       fileUrl: fileData.fileUrl,
+      storagePath: fileData.storagePath || null,
+      publicUrl: fileData.publicUrl || null,
       mimeType: fileData.mimeType,
       fileSize: fileData.fileSize,
       description: metadata.description,
       uploadedById: userId,
+      status: "UPLOADED"
     }
   });
 
@@ -100,4 +105,24 @@ export const deleteDocument = async (id: string, universityId: string) => {
   await prisma.document.delete({
     where: { id }
   });
+};
+
+export const runMockOcr = async (id: string, universityId: string) => {
+  const document = await getDocumentById(id, universityId);
+  
+  // Placeholder OCR processing delay
+  await new Promise(r => setTimeout(r, 2000));
+  
+  // Mock extracted data
+  return {
+    documentId: document.id,
+    extractedData: {
+      date: "2026-08-15",
+      vendor: "Utility Corp",
+      totalAmount: 12500,
+      unit: "kWh",
+      category: "PURCHASED_ELECTRICITY"
+    },
+    confidenceScore: 0.92
+  };
 };

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ActivityCategory, ActivityScope } from "../../generated/prisma/client";
+import { ActivityCategory, ActivityScope, ActivityInputSource } from "../../generated/prisma/client";
 
 const scope1Categories = [
   "DIESEL",
@@ -34,7 +34,12 @@ const baseActivityDataSchema = z.object({
   unit: z.string().min(1),
   
   activityDate: z.coerce.date(),
-  description: z.string().optional()
+  description: z.string().optional(),
+
+  inputSource: z.nativeEnum(ActivityInputSource).optional(),
+  sourceFileId: z.string().uuid().optional(),
+  sourceFileName: z.string().optional(),
+  sourceDocumentUrl: z.string().url().optional()
 });
 
 export const createActivityDataSchema = baseActivityDataSchema.refine(data => {

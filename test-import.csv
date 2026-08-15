@@ -1,0 +1,5 @@
+Category,Quantity,Unit,Activity Date,Building,Floor,Description
+PURCHASED_ELECTRICITY,10000,kWh,2026-04-01,Main Building,Ground,April electricity
+DIESEL,500,L,2026-04-02,Generator,-,Generator fuel
+PETROL,200,L,2026-04-03,Fleet,-,Vehicle fuel
+LPG,100,kg,2026-04-03,Hostel,-,Kitchen LPG

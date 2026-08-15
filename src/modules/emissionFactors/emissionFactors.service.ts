@@ -1,7 +1,7 @@
 import { prisma } from "../../config/prisma";
 import { CreateEmissionFactorInput, UpdateEmissionFactorInput } from "./emissionFactors.types";
-import { logEvent } from "../auditLogs/auditLogs.service";
-import { AuditAction } from "../../generated/prisma/client";
+import { createAuditLog } from "../auditLogs/auditLogs.service";
+import { AuditAction, EmissionFactorStatus } from "../../generated/prisma/client";
 
 export const createEmissionFactor = async (data: CreateEmissionFactorInput) => {
   const result = await prisma.emissionFactor.create({
@@ -23,8 +23,51 @@ export const createEmissionFactor = async (data: CreateEmissionFactorInput) => {
     }
   });
 
-  await logEvent(AuditAction.CREATE, "EmissionFactor", result.id, null, null, null, result, null, null);
+  await createAuditLog({
+    action: AuditAction.CREATE,
+    entityType: "EmissionFactor",
+    entityId: result.id,
+    newValue: result,
+    description: "Manual emission factor created"
+  });
   return result;
+};
+
+export const getPendingEfActivities = async (universityId: string, page = 1, limit = 20) => {
+  const skip = (page - 1) * limit;
+
+  // Pending EF = Activity is VERIFIED but has no calculation
+  const where = {
+    universityId,
+    status: "VERIFIED" as const,
+    calculations: {
+      none: {}
+    }
+  };
+
+  const [data, total] = await Promise.all([
+    prisma.activityData.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { activityDate: "desc" },
+      include: {
+        campus: { select: { name: true } },
+        building: { select: { name: true } }
+      }
+    }),
+    prisma.activityData.count({ where })
+  ]);
+
+  return {
+    data,
+    pagination: {
+      page: Number(page),
+      limit: Number(limit),
+      total,
+      totalPages: Math.ceil(total / Number(limit))
+    }
+  };
 };
 
 export const getEmissionFactors = async (filters: {
@@ -104,7 +147,14 @@ export const updateEmissionFactor = async (id: string, data: UpdateEmissionFacto
     }
   });
 
-  await logEvent(AuditAction.UPDATE, "EmissionFactor", id, null, null, { factor: factor.factor }, { factor: result.factor }, null, null);
+  await createAuditLog({
+    action: AuditAction.UPDATE,
+    entityType: "EmissionFactor",
+    entityId: id,
+    oldValue: { factor: factor.factor },
+    newValue: { factor: result.factor },
+    description: "Emission factor updated"
+  });
   return result;
 };
 

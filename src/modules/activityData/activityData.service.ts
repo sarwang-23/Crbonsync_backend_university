@@ -1,7 +1,7 @@
 import { prisma } from "../../config/prisma";
 import { CreateActivityDataInput, ActivityDataFilterParams } from "./activityData.types";
 import { ActivityStatus, AuditAction } from "../../generated/prisma/client";
-import { logEvent } from "../auditLogs/auditLogs.service";
+import { createAuditLog } from "../auditLogs/auditLogs.service";
 
 export const createActivityData = async (userId: string, data: CreateActivityDataInput) => {
   // Validate ReportingPeriod bounds
@@ -21,6 +21,18 @@ export const createActivityData = async (userId: string, data: CreateActivityDat
     throw new Error("Reporting period does not belong to the specified university");
   }
 
+  // Check for duplicate
+  const existing = await prisma.activityData.findFirst({
+    where: {
+      universityId: data.universityId,
+      reportingPeriodId: data.reportingPeriodId,
+      activityDate: data.activityDate,
+      category: data.category,
+      quantity: data.quantity,
+      unit: data.unit
+    }
+  });
+
   const result = await prisma.activityData.create({
     data: {
       universityId: data.universityId,
@@ -33,22 +45,21 @@ export const createActivityData = async (userId: string, data: CreateActivityDat
       quantity: data.quantity,
       unit: data.unit,
       activityDate: data.activityDate,
-      description: data.description,
+      description: existing ? `POSSIBLE_DUPLICATE: ${data.description || ''}` : data.description,
       status: "DRAFT",
       enteredById: userId,
     }
   });
 
-  await logEvent(
-    AuditAction.ACTIVITY_CREATED,
-    "ActivityData",
-    result.id,
-    userId,
-    data.universityId,
-    null,
-    result,
-    "Activity data created"
-  );
+  await createAuditLog({
+    action: AuditAction.ACTIVITY_CREATED,
+    entityType: "ActivityData",
+    entityId: result.id,
+    userId: userId || undefined,
+    universityId: data.universityId,
+    newValue: result,
+    description: "Activity data created"
+  });
 
   return result;
 };
@@ -126,8 +137,9 @@ export const getActivityDataById = async (id: string, universityId: string) => {
 export const updateActivityData = async (id: string, universityId: string, data: any) => {
   const record = await getActivityDataById(id, universityId);
   
-  if (record.status !== "DRAFT" && record.status !== "REJECTED") {
-    throw new Error("Only DRAFT or REJECTED activity data can be updated");
+  // Rule Step 5: DRAFT and UNDER_REVIEW (NEEDS_REVIEW) are editable. VERIFIED and CALCULATED are locked.
+  if (record.status === "VERIFIED" || record.status === "REJECTED") { // Calculated activities are usually verified first
+    throw new Error(`Cannot edit activity data that is ${record.status}. Request correction to move to DRAFT.`);
   }
 
   // Validate dates if updated
@@ -148,16 +160,15 @@ export const updateActivityData = async (id: string, universityId: string, data:
     data
   });
 
-  await logEvent(
-    AuditAction.ACTIVITY_UPDATED,
-    "ActivityData",
-    id,
-    null,
-    universityId,
-    { quantity: record.quantity },
-    { quantity: result.quantity },
-    "Activity quantity updated"
-  );
+  await createAuditLog({
+    action: AuditAction.ACTIVITY_UPDATED,
+    entityType: "ActivityData",
+    entityId: id,
+    universityId: universityId,
+    oldValue: { quantity: record.quantity },
+    newValue: { quantity: result.quantity },
+    description: "Activity data updated"
+  });
 
   return result;
 };
@@ -171,16 +182,76 @@ export const deleteActivityData = async (id: string, universityId: string) => {
 
   const result = await prisma.activityData.delete({ where: { id } });
 
-  await logEvent(
-    AuditAction.DELETE,
-    "ActivityData",
-    id,
-    null,
-    universityId,
-    record,
-    null,
-    "Activity data deleted"
-  );
+  await createAuditLog({
+    action: AuditAction.DELETE,
+    entityType: "ActivityData",
+    entityId: id,
+    universityId: universityId,
+    oldValue: record,
+    description: "Activity data deleted"
+  });
+
+  return result;
+};
+
+export const verifyActivityData = async (id: string, universityId: string, userId: string) => {
+  const record = await getActivityDataById(id, universityId);
+
+  // Checks required for verification (Step 3)
+  if (!record.category) throw new Error("Category is missing");
+  if (record.quantity <= 0) throw new Error("Quantity must be greater than 0");
+  if (!record.unit) throw new Error("Unit is missing");
+  if (!record.activityDate) throw new Error("Activity date is invalid");
+  
+  const period = await prisma.reportingPeriod.findUnique({ where: { id: record.reportingPeriodId } });
+  if (!period || period.universityId !== universityId) {
+    throw new Error("Invalid reporting period or university ownership mismatch");
+  }
+
+  const result = await prisma.activityData.update({
+    where: { id },
+    data: {
+      status: "VERIFIED",
+      verifiedById: userId,
+      verifiedAt: new Date()
+    }
+  });
+
+  await createAuditLog({
+    action: AuditAction.ACTIVITY_VERIFIED,
+    entityType: "ActivityData",
+    entityId: id,
+    userId: userId,
+    universityId: universityId,
+    description: "Activity verified"
+  });
+
+  return result;
+};
+
+export const rejectActivityData = async (id: string, universityId: string, userId: string, reason: string) => {
+  if (!reason) {
+    throw new Error("Rejection reason is mandatory");
+  }
+
+  const record = await getActivityDataById(id, universityId);
+
+  const result = await prisma.activityData.update({
+    where: { id },
+    data: {
+      status: "REJECTED",
+      rejectionReason: reason
+    }
+  });
+
+  await createAuditLog({
+    action: AuditAction.ACTIVITY_REJECTED,
+    entityType: "ActivityData",
+    entityId: id,
+    userId: userId,
+    universityId: universityId,
+    description: `Activity rejected: ${reason}`
+  });
 
   return result;
 };
@@ -198,15 +269,8 @@ export const changeActivityStatus = async (id: string, universityId: string, sta
   if (status === "UNDER_REVIEW" && current !== "SUBMITTED") {
     throw new Error("Only SUBMITTED records can be marked UNDER_REVIEW");
   }
-  if ((status === "VERIFIED" || status === "REJECTED") && current !== "UNDER_REVIEW") {
-    throw new Error("Only UNDER_REVIEW records can be VERIFIED or REJECTED");
-  }
   if (status === "DRAFT" && current !== "REJECTED") {
      throw new Error("Only REJECTED records can be reverted to DRAFT");
-  }
-
-  if (status === "REJECTED" && !rejectionReason) {
-    throw new Error("rejectionReason is required when rejecting activity data");
   }
 
   const result = await prisma.activityData.update({
@@ -219,17 +283,15 @@ export const changeActivityStatus = async (id: string, universityId: string, sta
     }
   });
 
-  if (status === "VERIFIED") {
-    await logEvent(
-      AuditAction.ACTIVITY_VERIFIED,
-      "ActivityData",
-      id,
-      userId,
-      universityId,
-      null,
-      null,
-      "Activity data verified"
-    );
+  if (status === "SUBMITTED" || status === "UNDER_REVIEW") {
+    await createAuditLog({
+      action: AuditAction.UPDATE,
+      entityType: "ActivityData",
+      entityId: id,
+      userId: userId,
+      universityId: universityId,
+      description: `Activity status changed to ${status}`
+    });
   }
 
   return result;

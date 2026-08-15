@@ -1,54 +1,25 @@
-import { Request, Response, NextFunction } from "express";
-import { getDataQualityOverview, getMissingData } from "./dataQuality.service";
+import { Request, Response } from "express";
+import { getDataQualityMetrics } from "./dataQuality.service";
 
-export const overview = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const universityId = String(req.query.universityId);
-
-    if (!universityId) {
-      return res.status(400).json({
-        success: false,
-        message: "universityId is required",
-      });
-    }
-
-    const reportingPeriodId = req.query.reportingPeriodId
-      ? String(req.query.reportingPeriodId)
-      : undefined;
-
-    const data = await getDataQualityOverview(universityId, reportingPeriodId);
-
-    return res.status(200).json({
-      success: true,
-      data,
-    });
-  } catch (error) {
-    next(error);
+const checkIsolation = (req: Request, targetUniversityId: string) => {
+  const jwtUniversityId = (req as any).user?.universityId;
+  if (jwtUniversityId && jwtUniversityId !== targetUniversityId) {
+    throw new Error("Access denied: University isolation mismatch");
   }
 };
 
-export const missingData = async (req: Request, res: Response, next: NextFunction) => {
+export const getMetricsController = async (req: Request, res: Response) => {
   try {
-    const universityId = String(req.query.universityId);
-
+    const universityId = req.query.universityId as string;
     if (!universityId) {
-      return res.status(400).json({
-        success: false,
-        message: "universityId is required",
-      });
+      return res.status(400).json({ success: false, message: "universityId is required" });
     }
-
-    const reportingPeriodId = req.query.reportingPeriodId
-      ? String(req.query.reportingPeriodId)
-      : undefined;
-
-    const data = await getMissingData(universityId, reportingPeriodId);
-
-    return res.status(200).json({
-      success: true,
-      data,
-    });
-  } catch (error) {
-    next(error);
+    
+    checkIsolation(req, universityId);
+    
+    const metrics = await getDataQualityMetrics(universityId);
+    return res.status(200).json(metrics);
+  } catch (error: any) {
+    return res.status(400).json({ success: false, message: error.message || "Failed to fetch metrics" });
   }
 };

@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
 }
 
 enum UserStatus {
@@ -44,17 +44,20 @@ model University {
   postalCode String?
   status     UniversityStatus @default(PENDING)
 
-  users            User[]
-  documents        Document[]
-  campuses         Campus[]
-  baselines        Baseline[]
-  activityData     ActivityData[]
-  reportingPeriods ReportingPeriod[]
-  targets          SustainabilityTarget[]
-  calculations     Calculation[]
-  reports          Report[]
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
+  users             User[]
+  documents         Document[]
+  uploadedDocuments UploadedDocument[]
+  campuses          Campus[]
+  baselines         Baseline[]
+  activityData      ActivityData[]
+  reportingPeriods  ReportingPeriod[]
+  targets           SustainabilityTarget[]
+  calculations      Calculation[]
+  reports           Report[]
+  importJobs        ImportJob[]
+  auditLogs         AuditLog[]
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
 
   @@index([name])
   @@index([status])
@@ -74,6 +77,7 @@ model User {
   createdActivities  ActivityData[] @relation("ActivityCreatedBy")
   verifiedActivities ActivityData[] @relation("ActivityVerifiedBy")
   uploadedDocuments  Document[]
+  auditLogs          AuditLog[]
 
   lastLoginAt DateTime?
   createdAt   DateTime  @default(now())
@@ -203,6 +207,16 @@ enum ActivityStatus {
   UNDER_REVIEW
   VERIFIED
   REJECTED
+  CALCULATED
+}
+
+enum ActivityInputSource {
+  MANUAL
+  CSV
+  EXCEL
+  INVOICE
+  PDF
+  API
 }
 
 enum ActivityCategory {
@@ -249,6 +263,11 @@ model ActivityData {
   verifiedAt   DateTime?
 
   rejectionReason String?
+
+  inputSource       ActivityInputSource @default(MANUAL)
+  sourceFileId      String?
+  sourceFileName    String?
+  sourceDocumentUrl String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -475,10 +494,24 @@ enum AuditAction {
   ACTIVITY_UPDATED
   ACTIVITY_VERIFIED
   ACTIVITY_CALCULATED
+  ACTIVITY_REJECTED
   EMISSION_FACTOR_SELECTED
   CALCULATION_CREATED
   REPORT_GENERATED
   REPORT_DOWNLOADED
+  UPLOAD
+  IMPORT
+  IMPORT_STARTED
+  IMPORT_COMPLETED
+  IMPORT_FAILED
+  DOCUMENT_UPLOADED
+  OCR_STARTED
+  OCR_COMPLETED
+  OCR_FAILED
+  DOCUMENT_DELETED
+  EF_RESOLVED_FIXED
+  EF_RESOLVED_CLIMATIQ
+  EF_CREATED_MANUAL
 }
 
 model AuditLog {
@@ -494,6 +527,7 @@ model AuditLog {
 
   oldValue Json?
   newValue Json?
+  metadata Json?
 
   description String?
 
@@ -501,6 +535,9 @@ model AuditLog {
   userAgent String?
 
   createdAt DateTime @default(now())
+
+  university University? @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([universityId])
   @@index([userId])
@@ -521,6 +558,12 @@ enum DocumentType {
   OTHER
 }
 
+enum DocumentStatus {
+  UPLOADED
+  PROCESSED
+  FAILED
+}
+
 model Document {
   id String @id @default(uuid())
 
@@ -534,6 +577,10 @@ model Document {
   fileUrl      String
   mimeType     String
   fileSize     Int
+
+  storagePath String?
+  publicUrl   String?
+  status      DocumentStatus @default(UPLOADED)
 
   description String?
 
@@ -695,3 +742,57 @@ model Report {
   @@index([reportingPeriodId])
   @@index([status])
 }
+
+enum ImportJobStatus {
+  UPLOADED
+  PROCESSING
+  PREVIEW
+  COMPLETED
+  PARTIAL
+  FAILED
+}
+
+model ImportJob {
+  id String @id @default(uuid())
+
+  universityId String
+  university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  fileName       String
+  fileType       String
+  totalRows      Int    @default(0)
+  successfulRows Int    @default(0)
+  failedRows     Int    @default(0)
+
+  status       ImportJobStatus @default(UPLOADED)
+  errorFileUrl String?
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([universityId])
+  @@index([status])
+}
+
+model UploadedDocument {
+  id           String @id @default(cuid())
+  universityId String
+
+  fileName     String
+  originalName String
+  mimeType     String
+  fileSize     Int?
+
+  storagePath String
+  publicUrl   String?
+
+  documentType String?
+  uploadedBy   String?
+  status       String  @default("UPLOADED")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  university University @relation(fields: [universityId], references: [id])
+}
+

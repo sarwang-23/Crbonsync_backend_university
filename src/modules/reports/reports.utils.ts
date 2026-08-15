@@ -3,18 +3,16 @@ import fs from "fs";
 import path from "path";
 
 export const generatePdf = async (
-  reportData: any,
-  filePath: string
-): Promise<void> => {
+  reportData: any
+): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
-    const dir = path.dirname(filePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
-    const stream = fs.createWriteStream(filePath);
-    doc.pipe(stream);
+    const buffers: Buffer[] = [];
+    doc.on('data', buffers.push.bind(buffers));
+    doc.on('end', () => {
+      resolve(Buffer.concat(buffers));
+    });
+    doc.on('error', reject);
 
     const addTitle = (title: string) => {
       doc.fontSize(18).fillColor('#2c3e50').text(title);
@@ -164,13 +162,5 @@ export const generatePdf = async (
     doc.text("Emission results are presented in kilograms CO2 equivalent (kgCO2e) and tonnes CO2 equivalent (tCO2e).");
 
     doc.end();
-
-    stream.on("finish", () => {
-      resolve();
-    });
-
-    stream.on("error", (error) => {
-      reject(error);
-    });
   });
 };

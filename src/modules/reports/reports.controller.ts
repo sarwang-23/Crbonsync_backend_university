@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import { generateReport, generateReportPdf, getReports, getReportById } from "./reports.service";
-import { logEvent } from "../auditLogs/auditLogs.service";
+import { createAuditLog } from "../auditLogs/auditLogs.service";
 import { AuditAction } from "../../generated/prisma/client";
+import { checkIsolation } from "../../middleware/checkIsolation.middleware";
+import { supabase } from "../../config/supabase";
 import path from "path";
 import fs from "fs";
 
@@ -24,9 +26,9 @@ export const generatePdf = async (req: Request, res: Response, next: NextFunctio
   } catch (error) { next(error); }
 };
 
-export const list = async (req: Request, res: Response, next: NextFunction) => {
+export const list = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
   try {
-    const universityId = req.query.universityId ? String(req.query.universityId) : "";
+    const universityId = req.query.universityId as string;
     if (!universityId) {
       return res.status(400).json({ success: false, message: "universityId is required" });
     }
@@ -40,39 +42,45 @@ export const getSingle = async (req: Request, res: Response, next: NextFunction)
   try {
     const data = await getReportById(String(req.params.id));
     if (!data) return res.status(404).json({ success: false, message: "Report not found" });
+    
+    checkIsolation(req, data.universityId);
+
     return res.status(200).json({ success: true, data });
   } catch (error) { next(error); }
 };
 
-export const download = async (req: Request, res: Response, next: NextFunction) => {
+export const downloadReport = async (req: Request, res: Response, next: NextFunction): Promise<any> => {
   try {
-    const report = await getReportById(String(req.params.id));
+    const id = req.params.id as string;
+    const report = await getReportById(id);
+
     if (!report || report.status !== "GENERATED" || !report.filePath) {
-      return res.status(404).json({ success: false, message: "Report not found or not ready" });
+      res.status(404).json({ success: false, message: "Report not found or not ready" });
+      return;
     }
 
-    const normalizedPath = path.resolve(report.filePath);
-    const reportsDir = path.resolve(process.cwd(), "storage/reports");
-    
-    if (!normalizedPath.startsWith(reportsDir)) {
-      return res.status(403).json({ success: false, message: "Invalid file path detected" });
+    // Check isolation
+    checkIsolation(req, report.universityId);
+
+    await createAuditLog({
+      action: AuditAction.REPORT_DOWNLOADED,
+      entityType: "Report",
+      entityId: report.id,
+      universityId: report.universityId,
+      metadata: { fileName: report.fileName },
+      description: "Report downloaded"
+    });
+
+    const { data } = supabase.storage
+      .from("carbonsynq-reports")
+      .getPublicUrl(report.filePath);
+
+    res.status(200).json({ success: true, url: data.publicUrl });
+  } catch (error: any) {
+    if (error.message === "Forbidden") {
+      res.status(403).json({ success: false, message: "Forbidden" });
+      return;
     }
-
-    if (!fs.existsSync(normalizedPath)) {
-      return res.status(404).json({ success: false, message: "Report file missing from disk" });
-    }
-
-    await logEvent(
-      AuditAction.REPORT_DOWNLOADED,
-      "Report",
-      report.id,
-      (req as any).user?.userId || null,
-      report.universityId,
-      null,
-      { fileName: report.fileName },
-      "Report downloaded"
-    );
-
-    res.download(normalizedPath, report.fileName || "carbon-report.pdf");
-  } catch (error) { next(error); }
+    next(error);
+  }
 };

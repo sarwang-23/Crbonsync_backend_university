@@ -5,7 +5,9 @@ import {
   getActivityDataById, 
   updateActivityData, 
   deleteActivityData,
-  changeActivityStatus
+  changeActivityStatus,
+  verifyActivityData,
+  rejectActivityData
 } from "./activityData.service";
 import { createActivityDataSchema, updateActivityDataSchema } from "./activityData.validator";
 import { ActivityStatus, ActivityCategory, ActivityScope } from "../../generated/prisma/client";
@@ -139,6 +141,29 @@ export const startReviewActivityDataController = async (req: Request, res: Respo
   }
 };
 
+export const getReviewActivitiesController = async (req: Request, res: Response) => {
+  try {
+    const universityId = req.query.universityId as string;
+    if (!universityId) {
+      return res.status(400).json({ success: false, message: "universityId is required" });
+    }
+    checkIsolation(req, universityId);
+
+    const result = await getActivityData({
+      universityId,
+      page: req.query.page ? parseInt(req.query.page as string, 10) : 1,
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 20,
+    });
+
+    // Filter for review statuses
+    const reviewData = result.data.filter(a => a.status === "DRAFT" || a.status === "UNDER_REVIEW");
+
+    return res.status(200).json({ success: true, data: reviewData });
+  } catch (error: any) {
+    return res.status(400).json({ success: false, message: error.message || "Failed to fetch review activities" });
+  }
+};
+
 export const verifyActivityDataController = async (req: Request, res: Response) => {
   try {
     const universityId = req.body.universityId as string;
@@ -148,26 +173,27 @@ export const verifyActivityDataController = async (req: Request, res: Response) 
     checkIsolation(req, universityId);
     const userId = (req as any).user?.userId || null;
     
-    const result = await changeActivityStatus(req.params.id as string, universityId, "VERIFIED", userId);
-    return res.status(200).json({ success: true, data: result, message: "Activity data verified successfully" });
+    const result = await verifyActivityData(req.params.id as string, universityId, userId);
+    return res.status(200).json({ success: true, data: result, message: "Activity verified successfully" });
   } catch (error: any) {
-    return res.status(400).json({ success: false, message: error.message || "Failed to verify activity data" });
+    return res.status(400).json({ success: false, message: error.message || "Failed to verify activity" });
   }
 };
 
 export const rejectActivityDataController = async (req: Request, res: Response) => {
   try {
     const universityId = req.body.universityId as string;
-    const rejectionReason = req.body.rejectionReason as string;
-    if (!universityId || !rejectionReason) {
-      return res.status(400).json({ success: false, message: "universityId and rejectionReason are required in body" });
+    const reason = req.body.reason as string;
+    
+    if (!universityId) {
+      return res.status(400).json({ success: false, message: "universityId is required in body" });
     }
     checkIsolation(req, universityId);
     const userId = (req as any).user?.userId || null;
     
-    const result = await changeActivityStatus(req.params.id as string, universityId, "REJECTED", userId, rejectionReason);
-    return res.status(200).json({ success: true, data: result, message: "Activity data rejected" });
+    const result = await rejectActivityData(req.params.id as string, universityId, userId, reason);
+    return res.status(200).json({ success: true, data: result, message: "Activity rejected successfully" });
   } catch (error: any) {
-    return res.status(400).json({ success: false, message: error.message || "Failed to reject activity data" });
+    return res.status(400).json({ success: false, message: error.message || "Failed to reject activity" });
   }
 };

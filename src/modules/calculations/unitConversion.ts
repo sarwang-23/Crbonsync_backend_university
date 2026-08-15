@@ -36,7 +36,45 @@ export const convertToEmissionFactorUnit = (
 
   // 4. Fuel Energy conversion (Volume/Mass to Energy)
   if (tUnit === "tj" || tUnit === "gj") {
-    throw new Error(`PENDING: Cannot automatically convert volume/mass (${activityUnit}) to energy (${tUnit}) for ${category}. Fuel-specific NCV conversion is required.`);
+    let energyMultiplier = 1;
+    
+    // Standard IPCC Default NCVs (approximate)
+    if (category === "DIESEL" || category === "GENERATOR_FUEL" || category === "BOILER_FUEL") {
+      if (normalizedActivityUnit === "l") {
+        // Diesel: ~36 MJ/L => 0.000036 TJ/L
+        energyMultiplier = 0.000036;
+      }
+    } else if (category === "PETROL") {
+      if (normalizedActivityUnit === "l") {
+        // Petrol: ~34.2 MJ/L => 0.0000342 TJ/L
+        energyMultiplier = 0.0000342;
+      }
+    } else if (category === "LPG") {
+      if (normalizedActivityUnit === "kg") {
+        // LPG: ~47.3 MJ/kg => 0.0000473 TJ/kg
+        energyMultiplier = 0.0000473;
+      }
+    } else if (category === "CNG" || category === "NATURAL_GAS") {
+      if (normalizedActivityUnit === "kg") {
+        // CNG: ~48 MJ/kg => 0.000048 TJ/kg
+        energyMultiplier = 0.000048;
+      } else if (normalizedActivityUnit === "m3") {
+        // Natural Gas: ~38 MJ/m3 => 0.000038 TJ/m3
+        energyMultiplier = 0.000038;
+      }
+    }
+
+    if (energyMultiplier === 1) {
+       throw new Error(`PENDING: Cannot automatically convert volume/mass (${activityUnit}) to energy (${tUnit}) for ${category}. Custom NCV configuration is required.`);
+    }
+
+    let energyResult = quantity * energyMultiplier;
+    
+    if (tUnit === "gj") {
+      energyResult = energyResult * 1000;
+    }
+    
+    return energyResult;
   }
 
   // 5. Unknown

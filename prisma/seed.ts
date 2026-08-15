@@ -156,9 +156,13 @@ async function seedIndiaEmissionFactors() {
 
 async function seedDefaultUniversity() {
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@gsu.edu';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@123';
   
-  const passwordHash = await bcrypt.hash(adminPassword, 10);
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
+  if (!adminPassword) {
+    throw new Error("SEED_ADMIN_PASSWORD is required for production seeding");
+  }
+
+  const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
   const existingAdmin = await prisma.user.findUnique({
     where: { email: adminEmail }
@@ -177,7 +181,7 @@ async function seedDefaultUniversity() {
           firstName: 'Super',
           lastName: 'Admin',
           email: adminEmail,
-          passwordHash,
+          passwordHash: hashedPassword,
           role: 'SUPER_ADMIN',
           status: 'ACTIVE'
         }

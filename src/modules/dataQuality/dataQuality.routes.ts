@@ -1,9 +1,8 @@
 import { Router } from "express";
-import { overview, missingData } from "./dataQuality.controller";
+import { getMetricsController } from "./dataQuality.controller";
 
 const dataQualityRouter = Router();
 
-dataQualityRouter.get("/overview", overview);
-dataQualityRouter.get("/missing-data", missingData);
+dataQualityRouter.get("/metrics", getMetricsController);
 
 export { dataQualityRouter };

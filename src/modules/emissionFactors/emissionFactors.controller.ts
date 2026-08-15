@@ -4,7 +4,8 @@ import {
   getEmissionFactors, 
   getEmissionFactorById, 
   updateEmissionFactor, 
-  deactivateEmissionFactor 
+  deactivateEmissionFactor,
+  getPendingEfActivities
 } from "./emissionFactors.service";
 import { createEmissionFactorSchema, updateEmissionFactorSchema } from "./emissionFactors.validator";
 
@@ -60,6 +61,23 @@ export const deactivateController = async (req: Request, res: Response, next: Ne
   try {
     await deactivateEmissionFactor(req.params.id as string);
     return res.status(200).json({ success: true, message: "Emission factor deactivated successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPendingActivitiesController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const universityId = req.query.universityId as string;
+    if (!universityId) {
+      return res.status(400).json({ success: false, message: "universityId is required" });
+    }
+
+    const page = req.query.page ? Number(req.query.page) : 1;
+    const limit = req.query.limit ? Number(req.query.limit) : 20;
+
+    const result = await getPendingEfActivities(universityId, page, limit);
+    return res.status(200).json({ success: true, ...result });
   } catch (error) {
     next(error);
   }

@@ -1,0 +1,652 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  UNIVERSITY_ADMIN
+  SUSTAINABILITY_MANAGER
+  FACILITIES_MANAGER
+  DATA_ENTRY
+  REVIEWER
+  AUDITOR
+  MANAGEMENT
+}
+
+enum UniversityStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+model University {
+  id          String           @id @default(uuid())
+  name        String
+  code        String           @unique
+  email       String?
+  phone       String?
+  website     String?
+  address     String?
+  city        String?
+  state       String?
+  country     String           @default("India")
+  postalCode  String?
+  status      UniversityStatus @default(PENDING)
+
+  users       User[]
+  documents   Document[]
+  campuses    Campus[]
+  baselines   Baseline[]
+  activityData ActivityData[]
+  reportingPeriods ReportingPeriod[]
+  targets     SustainabilityTarget[]
+  calculations Calculation[]
+  reports     Report[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([name])
+  @@index([status])
+}
+
+model User {
+  id            String     @id @default(uuid())
+  firstName     String
+  lastName      String?
+  email         String     @unique
+  passwordHash  String
+  role          UserRole   @default(DATA_ENTRY)
+  status        UserStatus @default(ACTIVE)
+
+  universityId  String?
+  university    University? @relation(fields: [universityId], references: [id], onDelete: SetNull)
+  createdActivities  ActivityData[] @relation("ActivityCreatedBy")
+  verifiedActivities ActivityData[] @relation("ActivityVerifiedBy")
+  uploadedDocuments  Document[]
+
+  lastLoginAt   DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([universityId])
+  @@index([role])
+  @@index([status])
+}
+model Campus {
+  id           String   @id @default(uuid())
+  name         String
+  code         String
+  address      String?
+  city         String?
+  state        String?
+  country      String   @default("India")
+  postalCode   String?
+
+  universityId String
+  university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  buildings    Building[]
+  activityData ActivityData[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([universityId, code])
+  @@index([universityId])
+}
+model Building {
+  id          String   @id @default(uuid())
+  name        String
+  code        String
+  description String?
+  address     String?
+
+  campusId    String
+  campus      Campus   @relation(fields: [campusId], references: [id], onDelete: Cascade)
+
+  floors      Floor[]
+  activityData ActivityData[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([campusId, code])
+  @@index([campusId])
+}
+model Floor {
+  id          String   @id @default(uuid())
+  name        String
+  code        String
+  floorNumber Int?
+  areaSqm     Float?
+
+  buildingId  String
+  building    Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  assets      Asset[]
+  activityData ActivityData[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([buildingId, code])
+  @@index([buildingId])
+}
+enum AssetStatus {
+  ACTIVE
+  INACTIVE
+  DECOMMISSIONED
+}
+
+enum AssetType {
+  ELECTRICITY_METER
+  SUB_METER
+  DIESEL_GENERATOR
+  LPG_EQUIPMENT
+  NATURAL_GAS_EQUIPMENT
+  BOILER
+  CHILLER
+  AIR_CONDITIONER
+  REFRIGERATION_SYSTEM
+  FIRE_SUPPRESSION_SYSTEM
+  OTHER
+}
+
+model Asset {
+  id          String      @id @default(uuid())
+  name        String
+  code        String
+  type        AssetType
+  status      AssetStatus @default(ACTIVE)
+
+  manufacturer String?
+  modelNumber  String?
+  capacity     Float?
+  capacityUnit String?
+
+  description String?
+
+  floorId     String
+  floor       Floor       @relation(fields: [floorId], references: [id], onDelete: Cascade)
+
+  activityData ActivityData[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([floorId, code])
+  @@index([floorId])
+  @@index([type])
+  @@index([status])
+}
+enum ActivityScope {
+  SCOPE_1
+  SCOPE_2
+}
+
+enum ActivityStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+}
+
+enum ActivityCategory {
+  DIESEL
+  PETROL
+  LPG
+  NATURAL_GAS
+  CNG
+  GENERATOR_FUEL
+  BOILER_FUEL
+  REFRIGERANT
+  OWNED_VEHICLE
+  PURCHASED_ELECTRICITY
+  PURCHASED_STEAM
+  PURCHASED_HEATING
+  PURCHASED_COOLING
+}
+
+model ActivityData {
+  id                 String           @id @default(uuid())
+
+  universityId       String
+  reportingPeriodId  String
+
+  campusId           String?
+  buildingId         String?
+  floorId            String?
+  assetId            String?
+
+  category           ActivityCategory
+  scope              ActivityScope
+
+  quantity           Float
+  unit               String
+
+  activityDate       DateTime?
+
+  description        String?
+
+  status             ActivityStatus   @default(DRAFT)
+
+  enteredById        String?
+  verifiedById       String?
+  verifiedAt         DateTime?
+
+  rejectionReason    String?
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  university         University       @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  reportingPeriod    ReportingPeriod  @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  campus             Campus?          @relation(fields: [campusId], references: [id], onDelete: SetNull)
+  building           Building?        @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+  floor              Floor?           @relation(fields: [floorId], references: [id], onDelete: SetNull)
+  asset              Asset?           @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  createdBy          User?            @relation("ActivityCreatedBy", fields: [enteredById], references: [id], onDelete: SetNull)
+  verifiedBy         User?            @relation("ActivityVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+
+  calculations       Calculation[]
+  documents          Document[]
+
+  @@index([universityId])
+  @@index([reportingPeriodId])
+  @@index([campusId])
+  @@index([buildingId])
+  @@index([floorId])
+  @@index([category])
+  @@index([scope])
+  @@index([status])
+  @@index([activityDate])
+}
+
+enum EmissionFactorStatus {
+  ACTIVE
+  INACTIVE
+  PENDING_REVIEW
+}
+
+enum CalculationStatus {
+  CALCULATED
+  FAILED
+  SUPERSEDED
+}
+
+enum ReportingPeriodStatus {
+  DRAFT
+  OPEN
+  SUBMITTED
+  VERIFIED
+  LOCKED
+}
+
+enum BaselineStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  LOCKED
+}
+
+enum RecommendationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum EmissionFactorSource {
+  GOVERNMENT
+  DEFRA
+  EPA
+  IPCC
+  IEA
+  GRID_FACTOR
+  CUSTOM
+  OTHER
+}
+
+model EmissionFactor {
+  id              String   @id @default(uuid())
+
+  name            String
+  category        ActivityCategory
+  scope           ActivityScope
+
+  factor          Float
+  unit            String
+
+  source          EmissionFactorSource
+  sourceName      String?
+  sourceVersion   String?
+  sourceUrl       String?
+
+  region          String?
+  country         String?
+
+  validFrom       DateTime?
+  validTo         DateTime?
+
+  status          EmissionFactorStatus @default(ACTIVE)
+
+  notes           String?
+
+  calculations    Calculation[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([category])
+  @@index([scope])
+  @@index([country])
+  @@index([region])
+  @@index([status])
+}
+
+model Calculation {
+  id                 String             @id @default(uuid())
+
+  universityId       String
+  reportingPeriodId  String
+  activityDataId     String
+  emissionFactorId   String
+
+  scope              ActivityScope
+
+  quantity           Float
+  activityUnit       String
+
+  emissionFactor     Float
+  factorUnit         String
+
+  co2eKg             Float
+
+  status             CalculationStatus @default(CALCULATED)
+
+  calculatedAt       DateTime           @default(now())
+
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  university         University         @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  reportingPeriod    ReportingPeriod    @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  activityData       ActivityData       @relation(fields: [activityDataId], references: [id], onDelete: Cascade)
+  emissionFactorRel  EmissionFactor     @relation(fields: [emissionFactorId], references: [id], onDelete: Restrict)
+
+  @@index([universityId])
+  @@index([reportingPeriodId])
+  @@index([activityDataId])
+  @@index([emissionFactorId])
+  @@index([scope])
+  @@index([status])
+}
+
+model Baseline {
+  id           String   @id @default(uuid())
+
+  universityId String
+  university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  baselineYear Int
+
+  scope1KgCO2e Float
+  scope2KgCO2e Float
+  totalKgCO2e  Float
+
+  methodology  String?
+  notes        String?
+
+  isLocked     Boolean  @default(false)
+
+  status       BaselineStatus @default(DRAFT)
+  approvedBy   String?
+  approvedAt   DateTime?
+  lockedAt     DateTime?
+
+  reportingPeriodId String?
+  reportingPeriod   ReportingPeriod? @relation(fields: [reportingPeriodId], references: [id], onDelete: SetNull)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([universityId, baselineYear])
+  @@index([universityId])
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  SUBMIT
+  APPROVE
+  REJECT
+  VERIFY
+  CALCULATE
+  LOGIN
+  LOGOUT
+}
+
+model AuditLog {
+  id            String      @id @default(uuid())
+
+  universityId  String?
+  userId        String?
+
+  action        AuditAction
+
+  entity        String
+  entityId      String?
+
+  oldValue      Json?
+  newValue      Json?
+
+  description   String?
+
+  ipAddress     String?
+  userAgent     String?
+
+  createdAt     DateTime    @default(now())
+
+  @@index([universityId])
+  @@index([userId])
+  @@index([entity])
+  @@index([entityId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+enum DocumentType {
+  ELECTRICITY_BILL
+  FUEL_INVOICE
+  LPG_INVOICE
+  NATURAL_GAS_INVOICE
+  REFRIGERANT_RECORD
+  METER_READING
+  VEHICLE_RECORD
+  OTHER
+}
+
+model Document {
+  id             String       @id @default(uuid())
+
+  universityId   String
+  activityDataId String?
+
+  documentType   DocumentType
+
+  fileName       String
+  originalName   String
+  fileUrl        String
+  mimeType       String
+  fileSize       Int
+
+  description    String?
+
+  uploadedById   String?
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  university     University   @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  activityData   ActivityData? @relation(fields: [activityDataId], references: [id], onDelete: SetNull)
+  uploadedBy     User?        @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([universityId])
+  @@index([activityDataId])
+  @@index([documentType])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+
+  userId    String
+  universityId String?
+
+  title     String
+  message   String
+
+  type      String?
+
+  isRead    Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+model ReportingPeriod {
+  id           String   @id @default(uuid())
+
+  universityId String
+  university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  name         String
+  startDate    DateTime
+  endDate      DateTime
+
+  isBaseline   Boolean  @default(false)
+
+  status       ReportingPeriodStatus @default(DRAFT)
+  description  String?
+
+  baselines    Baseline[]
+  activityData ActivityData[]
+  calculations Calculation[]
+  reports      Report[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([universityId])
+  @@index([isBaseline])
+  @@index([status])
+  @@index([startDate])
+  @@unique([universityId, name])
+  @@unique([universityId, startDate, endDate])
+}
+
+model SustainabilityTarget {
+  id           String   @id @default(uuid())
+
+  universityId String
+  university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  targetYear   Int
+  reductionPct Float
+
+  targetCo2eKg Float?
+
+  description  String?
+  status       String   @default("ACTIVE")
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([universityId])
+  @@index([targetYear])
+}
+
+model UniversityStatistics {
+  id           String   @id @default(uuid())
+
+  universityId String
+  reportingPeriodId String
+
+  studentCount Int?
+  staffCount   Int?
+  totalAreaSqm Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([universityId, reportingPeriodId])
+}
+
+model Recommendation {
+  id           String   @id @default(uuid())
+
+  universityId String
+  buildingId   String?
+
+  category     String
+  title        String
+  description  String
+
+  priority     RecommendationPriority
+
+  estimatedReductionKg Float?
+
+  status       String @default("OPEN")
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([universityId])
+  @@index([priority])
+  @@index([status])
+}
+
+enum ReportStatus {
+  GENERATING
+  GENERATED
+  FAILED
+}
+
+model Report {
+  id                 String       @id @default(uuid())
+
+  universityId       String
+  reportingPeriodId  String
+
+  name               String
+  status             ReportStatus @default(GENERATING)
+
+  filePath           String?
+  fileName           String?
+
+  totalEmissionsKg   Float?
+  scope1Kg           Float?
+  scope2Kg           Float?
+
+  generatedAt        DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  university         University   @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  reportingPeriod    ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+
+  @@index([universityId])
+  @@index([reportingPeriodId])
+  @@index([status])
+}

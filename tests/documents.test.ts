@@ -25,6 +25,6 @@ describe("Documents API", () => {
       .field("universityId", "uni-1");
 
     expect(response.status).toBe(400);
-    expect(response.body.message).toContain("No file provided");
+    expect(response.body.message).toContain("No file uploaded");
   });
 });

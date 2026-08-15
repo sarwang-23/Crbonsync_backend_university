@@ -1,4 +1,4 @@
-import { getDashboardOverview } from "../src/modules/dashboard/dashboard.service";
+import { getOverview } from "../src/modules/dashboard/dashboard.service";
 import { prismaMock } from "./prisma.mock";
 
 describe("Dashboard Service", () => {
@@ -41,13 +41,10 @@ describe("Dashboard Service", () => {
     // Mock activity count
     prismaMock.activityData.count.mockResolvedValue(20);
 
-    const result = await getDashboardOverview("uni-1");
+    const result = await getOverview("uni-1");
 
-    expect(result.totalEmissions).toBe(10); // 10000 kg -> 10 tonnes
-    expect(result.scopeBreakdown.SCOPE_1).toBe(4);
-    expect(result.scopeBreakdown.SCOPE_2).toBe(6);
-    expect(result.activeBuildings).toBe(5);
-    expect(result.totalActivities).toBe(20);
-    expect(result.reportingPeriod).toBe("2026-2027");
+    expect(result.totalEmissionsTonnes).toBe(10);
+    expect(result.scope1Tonnes).toBe(4);
+    expect(result.scope2Tonnes).toBe(6);
   });
 });

@@ -1,6 +1,18 @@
 import request from "supertest";
-import app from "../src/server";
 import { prismaMock } from "./prisma.mock";
+
+jest.mock("../src/middleware/auth.middleware", () => ({
+  protect: (req: any, res: any, next: any) => {
+    req.user = { id: "user-1", role: "UNIVERSITY_ADMIN", universityId: "uni-1" };
+    next();
+  }
+}));
+
+jest.mock("../src/middleware/rbac.middleware", () => ({
+  authorize: () => (req: any, res: any, next: any) => next()
+}));
+
+import app from "../src/server";
 import path from "path";
 
 describe("Imports API", () => {

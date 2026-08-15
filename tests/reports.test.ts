@@ -15,8 +15,12 @@ describe("Reports Service", () => {
       startDate: new Date(),
       endDate: new Date(),
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      description: null,
+      isBaseline: false
     });
+
+    prismaMock.university.findUnique.mockResolvedValue({ id: "uni-1", name: "Test Uni" } as any);
 
     prismaMock.report.create.mockResolvedValue({
       id: "rep-1",
@@ -25,6 +29,11 @@ describe("Reports Service", () => {
       name: "Annual Report 2026",
       status: "GENERATING",
       filePath: null,
+      fileName: null,
+      totalEmissionsKg: null,
+      scope1Kg: null,
+      scope2Kg: null,
+      generatedAt: null,
       createdAt: new Date(),
       updatedAt: new Date()
     });

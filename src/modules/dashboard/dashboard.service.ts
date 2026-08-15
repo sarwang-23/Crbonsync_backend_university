@@ -285,14 +285,18 @@ export const getIntensityMetrics = async (universityId: string, reportingPeriodI
     }
   }
 
-  // TODO: Add studentCount to University model, using dummy for now
-  const DUMMY_STUDENT_COUNT = 12000;
+  // Fetch actual student count from statistics
+  const stat = await prisma.universityStatistics.findFirst({
+    where: { universityId }
+  });
+  
+  const studentCount = stat?.studentCount || 0;
 
   return {
     totalEmissionsTonnes: Number(totalTCO2e.toFixed(2)),
-    studentCount: DUMMY_STUDENT_COUNT,
+    studentCount,
     totalAreaSqm,
-    tonnesPerStudent: DUMMY_STUDENT_COUNT > 0 ? Number((totalTCO2e / DUMMY_STUDENT_COUNT).toFixed(4)) : 0,
+    tonnesPerStudent: studentCount > 0 ? Number((totalTCO2e / studentCount).toFixed(4)) : 0,
     kgPerSqm: totalAreaSqm > 0 ? Number(((totalTCO2e * 1000) / totalAreaSqm).toFixed(2)) : 0
   };
 };

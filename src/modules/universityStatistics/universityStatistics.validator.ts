@@ -6,15 +6,16 @@ export const getStatisticsSchema = z.object({
 
 export const createStatisticSchema = z.object({
   universityId: z.string().uuid("Invalid university ID"),
-  metricName: z.string().min(1, "Metric name is required"),
-  metricValue: z.number(),
-  year: z.number().int().min(1900).max(2100)
-}).passthrough(); // Allowing passthrough in case there are other fields
+  reportingPeriodId: z.string().uuid("Invalid reporting period ID"),
+  studentCount: z.number().int().nonnegative().optional(),
+  staffCount: z.number().int().nonnegative().optional(),
+  totalAreaSqm: z.number().nonnegative().optional()
+}).passthrough();
 
 export const updateStatisticSchema = z.object({
-  metricName: z.string().min(1).optional(),
-  metricValue: z.number().optional(),
-  year: z.number().int().min(1900).max(2100).optional()
+  studentCount: z.number().int().nonnegative().optional(),
+  staffCount: z.number().int().nonnegative().optional(),
+  totalAreaSqm: z.number().nonnegative().optional()
 }).passthrough();
 
 export const statisticIdParamSchema = z.object({

@@ -1,3 +1,15 @@
+/**
+ * @swagger
+ * tags:
+ *   - name: Auth
+ *     description: Authentication and User Management
+ *   - name: Dashboard
+ *     description: Overview and Analytics Dashboard
+ *   - name: ActivityData
+ *     description: Emission Activity Data Management
+ *   - name: Baselines
+ *     description: Target and Baseline Tracking
+ */
 import { Router } from "express";
 
 import { authRouter } from "../../modules/auth/auth.routes";

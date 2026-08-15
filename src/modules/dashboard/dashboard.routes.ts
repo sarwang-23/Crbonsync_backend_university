@@ -1,3 +1,47 @@
+/**
+ * @swagger
+ * /dashboard/overview:
+ *   get:
+ *     summary: Get dashboard overview metrics
+ *     tags: [Dashboard]
+ *     parameters:
+ *       - in: query
+ *         name: universityId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Overview metrics successfully retrieved
+ * 
+ * /dashboard/scopes:
+ *   get:
+ *     summary: Get scope breakdown
+ *     tags: [Dashboard]
+ *     parameters:
+ *       - in: query
+ *         name: universityId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Scope breakdown retrieved
+ * 
+ * /dashboard/categories:
+ *   get:
+ *     summary: Get category breakdown
+ *     tags: [Dashboard]
+ *     parameters:
+ *       - in: query
+ *         name: universityId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Category breakdown retrieved
+ */
 import { Router } from "express";
 import {
   overview,

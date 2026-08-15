@@ -11,7 +11,13 @@ import { errorHandler } from "./middleware/error.middleware";
 const app = express();
 
 app.use(helmet());
-app.use(cors());
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || "http://localhost:3000",
+  optionsSuccessStatus: 200,
+  credentials: true
+};
+
+app.use(cors(corsOptions));
 
 // Global rate limiting
 const limiter = rateLimit({

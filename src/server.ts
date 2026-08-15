@@ -22,14 +22,15 @@ app.use(cors(corsOptions));
 // Global rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
+  max: 300,
   standardHeaders: true,
   legacyHeaders: false,
 });
 app.use(limiter);
 
 app.use(morgan("dev"));
-app.use(express.json());
+app.use(express.json({ limit: "2mb" }));
+app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 
 // Swagger setup
 const options = {

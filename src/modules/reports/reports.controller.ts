@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { generateReport, generateReportPdf, getReports, getReportById } from "./reports.service";
+import { logEvent } from "../auditLogs/auditLogs.service";
+import { AuditAction } from "../../generated/prisma/client";
 import path from "path";
 import fs from "fs";
 
@@ -49,10 +51,28 @@ export const download = async (req: Request, res: Response, next: NextFunction) 
       return res.status(404).json({ success: false, message: "Report not found or not ready" });
     }
 
-    if (!fs.existsSync(report.filePath)) {
+    const normalizedPath = path.resolve(report.filePath);
+    const reportsDir = path.resolve(process.cwd(), "storage/reports");
+    
+    if (!normalizedPath.startsWith(reportsDir)) {
+      return res.status(403).json({ success: false, message: "Invalid file path detected" });
+    }
+
+    if (!fs.existsSync(normalizedPath)) {
       return res.status(404).json({ success: false, message: "Report file missing from disk" });
     }
 
-    res.download(report.filePath, report.fileName || "carbon-report.pdf");
+    await logEvent(
+      AuditAction.REPORT_DOWNLOADED,
+      "Report",
+      report.id,
+      (req as any).user?.userId || null,
+      report.universityId,
+      null,
+      { fileName: report.fileName },
+      "Report downloaded"
+    );
+
+    res.download(normalizedPath, report.fileName || "carbon-report.pdf");
   } catch (error) { next(error); }
 };

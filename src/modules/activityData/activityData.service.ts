@@ -40,7 +40,7 @@ export const createActivityData = async (userId: string, data: CreateActivityDat
   });
 
   await logEvent(
-    AuditAction.CREATE,
+    AuditAction.ACTIVITY_CREATED,
     "ActivityData",
     result.id,
     userId,
@@ -149,7 +149,7 @@ export const updateActivityData = async (id: string, universityId: string, data:
   });
 
   await logEvent(
-    AuditAction.UPDATE,
+    AuditAction.ACTIVITY_UPDATED,
     "ActivityData",
     id,
     null,
@@ -221,7 +221,7 @@ export const changeActivityStatus = async (id: string, universityId: string, sta
 
   if (status === "VERIFIED") {
     await logEvent(
-      AuditAction.VERIFY,
+      AuditAction.ACTIVITY_VERIFIED,
       "ActivityData",
       id,
       userId,

@@ -1,6 +1,8 @@
 import { prisma } from "../../config/prisma";
 import { logEvent } from "../auditLogs/auditLogs.service";
 import { AuditAction } from "../../generated/prisma/client";
+import { getEmissionFactor } from "../emissionFactors/ef.resolver";
+import { convertToEmissionFactorUnit, getCo2eMultiplier } from "./unitConversion";
 
 export const calculateActivity = async (activityId: string) => {
   const activity = await prisma.activityData.findUnique({
@@ -25,53 +27,108 @@ export const calculateActivity = async (activityId: string) => {
     throw new Error("Reporting period is locked");
   }
 
-  const factor = await prisma.emissionFactor.findFirst({
-    where: {
-      category: activity.category,
-      scope: activity.scope,
-      status: "ACTIVE",
-      OR: [
-        { country: activity.university.country },
-        { country: null },
-      ]
-    },
-    orderBy: [
-      { country: "desc" },
-      { createdAt: "desc" }
-    ]
-  });
+  // Determine the year for EF lookup from the activity date or reporting period
+  const activityYear = activity.activityDate
+    ? new Date(activity.activityDate).getFullYear()
+    : new Date(period.startDate).getFullYear();
 
-  if (!factor) {
-    throw new Error(`No emission factor found for ${activity.category}`);
+  // Determine country from activity's campus country or university default
+  const country = activity.university.country ?? "IN";
+
+  // ── EF Resolver: Fixed → Cache → Climatiq → PENDING ──────────
+  let resolvedFactor: Awaited<ReturnType<typeof getEmissionFactor>>;
+  try {
+    resolvedFactor = await getEmissionFactor({
+      category: activity.category,
+      country,
+      year: activityYear,
+      activityUnit: activity.unit
+    });
+  } catch (err: any) {
+    // Structured PENDING error from resolver
+    if (err?.status === "PENDING") {
+      await prisma.activityData.update({
+        where: { id: activityId },
+        data: { status: "DRAFT" } // revert so it can be re-submitted after EF is available
+      });
+      throw new Error(err.message ?? "No emission factor available for this activity");
+    }
+    throw err;
   }
 
-  const co2eKg = activity.quantity * factor.factor;
+  let convertedQuantity: number;
+  try {
+    convertedQuantity = convertToEmissionFactorUnit(
+      activity.quantity,
+      activity.unit,
+      resolvedFactor.unit,
+      activity.category
+    );
+  } catch (err: any) {
+    if (err.message.includes("PENDING")) {
+      await prisma.activityData.update({
+        where: { id: activityId },
+        data: { status: "DRAFT" }
+      });
+      throw new Error(err.message);
+    }
+    throw err;
+  }
 
+  const multiplier = getCo2eMultiplier(resolvedFactor.unit);
+  const co2eKg = convertedQuantity * resolvedFactor.factor * multiplier;
+
+  // ── Save Calculation with factor snapshot ──────────────────────
   const result = await prisma.calculation.create({
     data: {
       universityId: activity.universityId,
       reportingPeriodId: activity.reportingPeriodId,
       activityDataId: activity.id,
-      emissionFactorId: factor.id,
+      emissionFactorId: resolvedFactor.id,
       scope: activity.scope,
       quantity: activity.quantity,
       activityUnit: activity.unit,
-      emissionFactor: factor.factor,
-      factorUnit: factor.unit,
+      emissionFactor: resolvedFactor.factor,
+      factorUnit: resolvedFactor.unit,
+      factorSource: resolvedFactor.source,
+      factorVersion: resolvedFactor.sourceVersion ?? null,
+      factorName: resolvedFactor.factorName,
       co2eKg,
       status: "CALCULATED",
     }
   });
 
   await logEvent(
-    AuditAction.CALCULATE,
+    AuditAction.EMISSION_FACTOR_SELECTED,
+    "EmissionFactor",
+    resolvedFactor.id,
+    null,
+    activity.universityId,
+    null,
+    { factor: resolvedFactor.factor, source: resolvedFactor.source },
+    "Emission factor selected for calculation"
+  );
+
+  await logEvent(
+    AuditAction.CALCULATION_CREATED,
     "Calculation",
     result.id,
     null,
     activity.universityId,
     null,
-    result,
+    { co2eKg },
     "Calculation created"
+  );
+
+  await logEvent(
+    AuditAction.ACTIVITY_CALCULATED,
+    "ActivityData",
+    activity.id,
+    null,
+    activity.universityId,
+    null,
+    { calculationId: result.id, co2eKg },
+    "Activity data calculated"
   );
 
   return result;

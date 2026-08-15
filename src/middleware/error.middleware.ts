@@ -13,8 +13,10 @@ export const errorHandler = (err: any, req: Request, res: Response, next: NextFu
     return;
   }
 
+  const isProd = process.env.NODE_ENV === "production";
+
   res.status(500).json({
     success: false,
-    message: err.message || "Something went wrong"
+    message: isProd ? "Internal Server Error" : err.message || "Something went wrong"
   });
 };

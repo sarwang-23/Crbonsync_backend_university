@@ -1,4 +1,6 @@
 import { prisma } from "../../config/prisma";
+import { logEvent } from "../auditLogs/auditLogs.service";
+import { AuditAction } from "../../generated/prisma/client";
 import { 
   getOverview, 
   getScopeBreakdown, 
@@ -110,6 +112,18 @@ export const generateReportPdf = async (reportId: string) => {
     for (const u of usersToNotify) {
       await createNotification(u.id, report.universityId, 'Carbon Report Generated', 'Your carbon emissions report for ' + report.reportingPeriod.name + ' has been generated successfully.', 'REPORT_GENERATED');
     }
+
+    await logEvent(
+      AuditAction.REPORT_GENERATED,
+      "Report",
+      report.id,
+      null,
+      report.universityId,
+      null,
+      { fileName, status: 'GENERATED' },
+      null,
+      null
+    );
     
     return { status: 'GENERATED', filePath, fileName };
   } catch (error) {

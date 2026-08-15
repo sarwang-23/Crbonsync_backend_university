@@ -31,67 +31,68 @@ enum UniversityStatus {
 }
 
 model University {
-  id          String           @id @default(uuid())
-  name        String
-  code        String           @unique
-  email       String?
-  phone       String?
-  website     String?
-  address     String?
-  city        String?
-  state       String?
-  country     String           @default("India")
-  postalCode  String?
-  status      UniversityStatus @default(PENDING)
+  id         String           @id @default(uuid())
+  name       String
+  code       String           @unique
+  email      String?
+  phone      String?
+  website    String?
+  address    String?
+  city       String?
+  state      String?
+  country    String           @default("India")
+  postalCode String?
+  status     UniversityStatus @default(PENDING)
 
-  users       User[]
-  documents   Document[]
-  campuses    Campus[]
-  baselines   Baseline[]
-  activityData ActivityData[]
+  users            User[]
+  documents        Document[]
+  campuses         Campus[]
+  baselines        Baseline[]
+  activityData     ActivityData[]
   reportingPeriods ReportingPeriod[]
-  targets     SustainabilityTarget[]
-  calculations Calculation[]
-  reports     Report[]
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  targets          SustainabilityTarget[]
+  calculations     Calculation[]
+  reports          Report[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
 
   @@index([name])
   @@index([status])
 }
 
 model User {
-  id            String     @id @default(uuid())
-  firstName     String
-  lastName      String?
-  email         String     @unique
-  passwordHash  String
-  role          UserRole   @default(DATA_ENTRY)
-  status        UserStatus @default(ACTIVE)
+  id           String     @id @default(uuid())
+  firstName    String
+  lastName     String?
+  email        String     @unique
+  passwordHash String
+  role         UserRole   @default(DATA_ENTRY)
+  status       UserStatus @default(ACTIVE)
 
-  universityId  String?
-  university    University? @relation(fields: [universityId], references: [id], onDelete: SetNull)
+  universityId       String?
+  university         University?    @relation(fields: [universityId], references: [id], onDelete: SetNull)
   createdActivities  ActivityData[] @relation("ActivityCreatedBy")
   verifiedActivities ActivityData[] @relation("ActivityVerifiedBy")
   uploadedDocuments  Document[]
 
-  lastLoginAt   DateTime?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([universityId])
   @@index([role])
   @@index([status])
 }
+
 model Campus {
-  id           String   @id @default(uuid())
-  name         String
-  code         String
-  address      String?
-  city         String?
-  state        String?
-  country      String   @default("India")
-  postalCode   String?
+  id         String  @id @default(uuid())
+  name       String
+  code       String
+  address    String?
+  city       String?
+  state      String?
+  country    String  @default("India")
+  postalCode String?
 
   universityId String
   university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
@@ -99,48 +100,51 @@ model Campus {
   buildings    Building[]
   activityData ActivityData[]
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([universityId, code])
   @@index([universityId])
 }
+
 model Building {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   name        String
   code        String
   description String?
   address     String?
 
-  campusId    String
-  campus      Campus   @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  campusId String
+  campus   Campus @relation(fields: [campusId], references: [id], onDelete: Cascade)
 
-  floors      Floor[]
+  floors       Floor[]
   activityData ActivityData[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([campusId, code])
   @@index([campusId])
 }
+
 model Floor {
-  id          String   @id @default(uuid())
+  id          String @id @default(uuid())
   name        String
   code        String
   floorNumber Int?
   areaSqm     Float?
 
-  buildingId  String
-  building    Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  assets      Asset[]
+  buildingId   String
+  building     Building       @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  assets       Asset[]
   activityData ActivityData[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
   @@unique([buildingId, code])
   @@index([buildingId])
 }
+
 enum AssetStatus {
   ACTIVE
   INACTIVE
@@ -162,11 +166,11 @@ enum AssetType {
 }
 
 model Asset {
-  id          String      @id @default(uuid())
-  name        String
-  code        String
-  type        AssetType
-  status      AssetStatus @default(ACTIVE)
+  id     String      @id @default(uuid())
+  name   String
+  code   String
+  type   AssetType
+  status AssetStatus @default(ACTIVE)
 
   manufacturer String?
   modelNumber  String?
@@ -175,18 +179,19 @@ model Asset {
 
   description String?
 
-  floorId     String
-  floor       Floor       @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  floorId String
+  floor   Floor  @relation(fields: [floorId], references: [id], onDelete: Cascade)
 
   activityData ActivityData[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
   @@unique([floorId, code])
   @@index([floorId])
   @@index([type])
   @@index([status])
 }
+
 enum ActivityScope {
   SCOPE_1
   SCOPE_2
@@ -217,48 +222,48 @@ enum ActivityCategory {
 }
 
 model ActivityData {
-  id                 String           @id @default(uuid())
+  id String @id @default(uuid())
 
-  universityId       String
-  reportingPeriodId  String
+  universityId      String
+  reportingPeriodId String
 
-  campusId           String?
-  buildingId         String?
-  floorId            String?
-  assetId            String?
+  campusId   String?
+  buildingId String?
+  floorId    String?
+  assetId    String?
 
-  category           ActivityCategory
-  scope              ActivityScope
+  category ActivityCategory
+  scope    ActivityScope
 
-  quantity           Float
-  unit               String
+  quantity Float
+  unit     String
 
-  activityDate       DateTime?
+  activityDate DateTime?
 
-  description        String?
+  description String?
 
-  status             ActivityStatus   @default(DRAFT)
+  status ActivityStatus @default(DRAFT)
 
-  enteredById        String?
-  verifiedById       String?
-  verifiedAt         DateTime?
+  enteredById  String?
+  verifiedById String?
+  verifiedAt   DateTime?
 
-  rejectionReason    String?
+  rejectionReason String?
 
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  university         University       @relation(fields: [universityId], references: [id], onDelete: Cascade)
-  reportingPeriod    ReportingPeriod  @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
-  campus             Campus?          @relation(fields: [campusId], references: [id], onDelete: SetNull)
-  building           Building?        @relation(fields: [buildingId], references: [id], onDelete: SetNull)
-  floor              Floor?           @relation(fields: [floorId], references: [id], onDelete: SetNull)
-  asset              Asset?           @relation(fields: [assetId], references: [id], onDelete: SetNull)
-  createdBy          User?            @relation("ActivityCreatedBy", fields: [enteredById], references: [id], onDelete: SetNull)
-  verifiedBy         User?            @relation("ActivityVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  university      University      @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  reportingPeriod ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  campus          Campus?         @relation(fields: [campusId], references: [id], onDelete: SetNull)
+  building        Building?       @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+  floor           Floor?          @relation(fields: [floorId], references: [id], onDelete: SetNull)
+  asset           Asset?          @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  createdBy       User?           @relation("ActivityCreatedBy", fields: [enteredById], references: [id], onDelete: SetNull)
+  verifiedBy      User?           @relation("ActivityVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
 
-  calculations       Calculation[]
-  documents          Document[]
+  calculations Calculation[]
+  documents    Document[]
 
   @@index([universityId])
   @@index([reportingPeriodId])
@@ -311,77 +316,88 @@ enum EmissionFactorSource {
   EPA
   IPCC
   IEA
+  CEA
+  INCCA
   GRID_FACTOR
   CUSTOM
   OTHER
+  CLIMATIQ
 }
 
 model EmissionFactor {
-  id              String   @id @default(uuid())
+  id String @id @default(uuid())
 
-  name            String
-  category        ActivityCategory
-  scope           ActivityScope
+  name     String
+  category ActivityCategory
+  scope    ActivityScope
 
-  factor          Float
-  unit            String
+  factor Float
+  unit   String
 
-  source          EmissionFactorSource
-  sourceName      String?
-  sourceVersion   String?
-  sourceUrl       String?
+  source        EmissionFactorSource
+  sourceName    String?
+  sourceVersion String?
+  sourceUrl     String?
 
-  region          String?
-  country         String?
+  region  String?
+  country String?
 
-  validFrom       DateTime?
-  validTo         DateTime?
+  validFrom DateTime?
+  validTo   DateTime?
 
-  status          EmissionFactorStatus @default(ACTIVE)
+  status EmissionFactorStatus @default(ACTIVE)
 
-  notes           String?
+  isFixed Boolean @default(false)
+  year    Int?
 
-  calculations    Calculation[]
+  notes String?
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  calculations Calculation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([category])
   @@index([scope])
   @@index([country])
   @@index([region])
   @@index([status])
+  @@index([isFixed])
+  @@index([year])
 }
 
 model Calculation {
-  id                 String             @id @default(uuid())
+  id String @id @default(uuid())
 
-  universityId       String
-  reportingPeriodId  String
-  activityDataId     String
-  emissionFactorId   String
+  universityId      String
+  reportingPeriodId String
+  activityDataId    String
+  emissionFactorId  String
 
-  scope              ActivityScope
+  scope ActivityScope
 
-  quantity           Float
-  activityUnit       String
+  quantity     Float
+  activityUnit String
 
-  emissionFactor     Float
-  factorUnit         String
+  emissionFactor Float
+  factorUnit     String
+  factorSource   String?
+  factorVersion  String?
+  factorName     String?
 
-  co2eKg             Float
+  co2eKg Float
 
-  status             CalculationStatus @default(CALCULATED)
+  status CalculationStatus @default(CALCULATED)
 
-  calculatedAt       DateTime           @default(now())
+  calculatedAt DateTime @default(now())
 
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  university         University         @relation(fields: [universityId], references: [id], onDelete: Cascade)
-  reportingPeriod    ReportingPeriod    @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
-  activityData       ActivityData       @relation(fields: [activityDataId], references: [id], onDelete: Cascade)
-  emissionFactorRel  EmissionFactor     @relation(fields: [emissionFactorId], references: [id], onDelete: Restrict)
+  university        University      @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  reportingPeriod   ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  activityData      ActivityData    @relation(fields: [activityDataId], references: [id], onDelete: Cascade)
+  emissionFactorRel EmissionFactor  @relation(fields: [emissionFactorId], references: [id], onDelete: Restrict)
 
   @@index([universityId])
   @@index([reportingPeriodId])
@@ -391,8 +407,25 @@ model Calculation {
   @@index([status])
 }
 
+model ClimatiqCache {
+  id              String           @id @default(uuid())
+  category        ActivityCategory
+  country         String
+  year            Int
+  factor          Float
+  unit            String
+  climatiqId      String
+  climatiqVersion String?
+  fetchedAt       DateTime         @default(now())
+
+  @@unique([category, country, year, unit])
+  @@index([category])
+  @@index([country])
+  @@index([year])
+}
+
 model Baseline {
-  id           String   @id @default(uuid())
+  id String @id @default(uuid())
 
   universityId String
   university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
@@ -403,21 +436,21 @@ model Baseline {
   scope2KgCO2e Float
   totalKgCO2e  Float
 
-  methodology  String?
-  notes        String?
+  methodology String?
+  notes       String?
 
-  isLocked     Boolean  @default(false)
+  isLocked Boolean @default(false)
 
-  status       BaselineStatus @default(DRAFT)
-  approvedBy   String?
-  approvedAt   DateTime?
-  lockedAt     DateTime?
+  status     BaselineStatus @default(DRAFT)
+  approvedBy String?
+  approvedAt DateTime?
+  lockedAt   DateTime?
 
   reportingPeriodId String?
   reportingPeriod   ReportingPeriod? @relation(fields: [reportingPeriodId], references: [id], onDelete: SetNull)
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([universityId, baselineYear])
   @@index([universityId])
@@ -434,28 +467,40 @@ enum AuditAction {
   CALCULATE
   LOGIN
   LOGOUT
+  GENERATE
+  DOWNLOAD
+  EXPORT
+  VIEW
+  ACTIVITY_CREATED
+  ACTIVITY_UPDATED
+  ACTIVITY_VERIFIED
+  ACTIVITY_CALCULATED
+  EMISSION_FACTOR_SELECTED
+  CALCULATION_CREATED
+  REPORT_GENERATED
+  REPORT_DOWNLOADED
 }
 
 model AuditLog {
-  id            String      @id @default(uuid())
+  id String @id @default(uuid())
 
-  universityId  String?
-  userId        String?
+  universityId String?
+  userId       String?
 
-  action        AuditAction
+  action AuditAction
 
-  entity        String
-  entityId      String?
+  entity   String
+  entityId String?
 
-  oldValue      Json?
-  newValue      Json?
+  oldValue Json?
+  newValue Json?
 
-  description   String?
+  description String?
 
-  ipAddress     String?
-  userAgent     String?
+  ipAddress String?
+  userAgent String?
 
-  createdAt     DateTime    @default(now())
+  createdAt DateTime @default(now())
 
   @@index([universityId])
   @@index([userId])
@@ -477,29 +522,29 @@ enum DocumentType {
 }
 
 model Document {
-  id             String       @id @default(uuid())
+  id String @id @default(uuid())
 
   universityId   String
   activityDataId String?
 
-  documentType   DocumentType
+  documentType DocumentType
 
-  fileName       String
-  originalName   String
-  fileUrl        String
-  mimeType       String
-  fileSize       Int
+  fileName     String
+  originalName String
+  fileUrl      String
+  mimeType     String
+  fileSize     Int
 
-  description    String?
+  description String?
 
-  uploadedById   String?
+  uploadedById String?
 
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  university     University   @relation(fields: [universityId], references: [id], onDelete: Cascade)
-  activityData   ActivityData? @relation(fields: [activityDataId], references: [id], onDelete: SetNull)
-  uploadedBy     User?        @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  university   University    @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  activityData ActivityData? @relation(fields: [activityDataId], references: [id], onDelete: SetNull)
+  uploadedBy   User?         @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
 
   @@index([universityId])
   @@index([activityDataId])
@@ -507,17 +552,17 @@ model Document {
 }
 
 model Notification {
-  id        String   @id @default(uuid())
+  id String @id @default(uuid())
 
-  userId    String
+  userId       String
   universityId String?
 
-  title     String
-  message   String
+  title   String
+  message String
 
-  type      String?
+  type String?
 
-  isRead    Boolean  @default(false)
+  isRead Boolean @default(false)
 
   createdAt DateTime @default(now())
 
@@ -526,38 +571,38 @@ model Notification {
 }
 
 model ReportingPeriod {
-  id           String   @id @default(uuid())
+  id String @id @default(uuid())
 
   universityId String
   university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
 
-  name         String
-  startDate    DateTime
-  endDate      DateTime
+  name      String
+  startDate DateTime
+  endDate   DateTime
 
-  isBaseline   Boolean  @default(false)
+  isBaseline Boolean @default(false)
 
-  status       ReportingPeriodStatus @default(DRAFT)
-  description  String?
+  status      ReportingPeriodStatus @default(DRAFT)
+  description String?
 
   baselines    Baseline[]
   activityData ActivityData[]
   calculations Calculation[]
   reports      Report[]
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  @@unique([universityId, name])
+  @@unique([universityId, startDate, endDate])
   @@index([universityId])
   @@index([isBaseline])
   @@index([status])
   @@index([startDate])
-  @@unique([universityId, name])
-  @@unique([universityId, startDate, endDate])
 }
 
 model SustainabilityTarget {
-  id           String   @id @default(uuid())
+  id String @id @default(uuid())
 
   universityId String
   university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
@@ -567,20 +612,20 @@ model SustainabilityTarget {
 
   targetCo2eKg Float?
 
-  description  String?
-  status       String   @default("ACTIVE")
+  description String?
+  status      String  @default("ACTIVE")
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([universityId])
   @@index([targetYear])
 }
 
 model UniversityStatistics {
-  id           String   @id @default(uuid())
+  id String @id @default(uuid())
 
-  universityId String
+  universityId      String
   reportingPeriodId String
 
   studentCount Int?
@@ -594,23 +639,23 @@ model UniversityStatistics {
 }
 
 model Recommendation {
-  id           String   @id @default(uuid())
+  id String @id @default(uuid())
 
   universityId String
   buildingId   String?
 
-  category     String
-  title        String
-  description  String
+  category    String
+  title       String
+  description String
 
-  priority     RecommendationPriority
+  priority RecommendationPriority
 
   estimatedReductionKg Float?
 
-  status       String @default("OPEN")
+  status String @default("OPEN")
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([universityId])
   @@index([priority])
@@ -624,27 +669,27 @@ enum ReportStatus {
 }
 
 model Report {
-  id                 String       @id @default(uuid())
+  id String @id @default(uuid())
 
-  universityId       String
-  reportingPeriodId  String
+  universityId      String
+  reportingPeriodId String
 
-  name               String
-  status             ReportStatus @default(GENERATING)
+  name   String
+  status ReportStatus @default(GENERATING)
 
-  filePath           String?
-  fileName           String?
+  filePath String?
+  fileName String?
 
-  totalEmissionsKg   Float?
-  scope1Kg           Float?
-  scope2Kg           Float?
+  totalEmissionsKg Float?
+  scope1Kg         Float?
+  scope2Kg         Float?
 
-  generatedAt        DateTime?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  generatedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  university         University   @relation(fields: [universityId], references: [id], onDelete: Cascade)
-  reportingPeriod    ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
+  university      University      @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  reportingPeriod ReportingPeriod @relation(fields: [reportingPeriodId], references: [id], onDelete: Cascade)
 
   @@index([universityId])
   @@index([reportingPeriodId])

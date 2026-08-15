@@ -1,8 +1,10 @@
 import { prisma } from "../../config/prisma";
 import { CreateEmissionFactorInput, UpdateEmissionFactorInput } from "./emissionFactors.types";
+import { logEvent } from "../auditLogs/auditLogs.service";
+import { AuditAction } from "../../generated/prisma/client";
 
 export const createEmissionFactor = async (data: CreateEmissionFactorInput) => {
-  return prisma.emissionFactor.create({
+  const result = await prisma.emissionFactor.create({
     data: {
       name: data.name,
       category: data.category,
@@ -20,6 +22,9 @@ export const createEmissionFactor = async (data: CreateEmissionFactorInput) => {
       notes: data.notes,
     }
   });
+
+  await logEvent(AuditAction.CREATE, "EmissionFactor", result.id, null, null, null, result, null, null);
+  return result;
 };
 
 export const getEmissionFactors = async (filters: {
@@ -78,7 +83,7 @@ export const getEmissionFactorById = async (id: string) => {
 export const updateEmissionFactor = async (id: string, data: UpdateEmissionFactorInput) => {
   const factor = await getEmissionFactorById(id);
 
-  return prisma.emissionFactor.update({
+  const result = await prisma.emissionFactor.update({
     where: { id },
     data: {
       name: data.name,
@@ -98,6 +103,9 @@ export const updateEmissionFactor = async (id: string, data: UpdateEmissionFacto
       status: data.status,
     }
   });
+
+  await logEvent(AuditAction.UPDATE, "EmissionFactor", id, null, null, { factor: factor.factor }, { factor: result.factor }, null, null);
+  return result;
 };
 
 export const deactivateEmissionFactor = async (id: string) => {

@@ -5,7 +5,7 @@
   "description": "CarbonSynq University Management System backend",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "npm install --include=dev && npx prisma generate && tsc",
     "start": "node dist/server.js",
     "start:prod": "npx prisma migrate deploy && node dist/server.js",
     "test": "jest",

@@ -11,7 +11,7 @@ describe("Reports Service", () => {
       id: "rp-1",
       universityId: "uni-1",
       name: "2026-2027",
-      status: "ACTIVE",
+      status: "OPEN",
       startDate: new Date(),
       endDate: new Date(),
       createdAt: new Date(),
@@ -24,10 +24,7 @@ describe("Reports Service", () => {
       reportingPeriodId: "rp-1",
       name: "Annual Report 2026",
       status: "GENERATING",
-      type: "GHG_INVENTORY",
-      generatedBy: "user-1",
       filePath: null,
-      metadata: null,
       createdAt: new Date(),
       updatedAt: new Date()
     });
@@ -35,16 +32,10 @@ describe("Reports Service", () => {
     // Mock calculations check
     prismaMock.calculation.findMany.mockResolvedValue([{ id: "calc-1" } as any]);
 
-    const result = await generateReport({
-      universityId: "uni-1",
-      reportingPeriodId: "rp-1",
-      name: "Annual Report 2026",
-      type: "GHG_INVENTORY",
-      userId: "user-1"
-    });
+    const result = await generateReport("uni-1", "rp-1");
 
     expect(result.status).toBe("GENERATING");
-    expect(result.id).toBe("rep-1");
+    expect(result.reportId).toBe("rep-1");
     expect(prismaMock.report.create).toHaveBeenCalled();
   });
 });

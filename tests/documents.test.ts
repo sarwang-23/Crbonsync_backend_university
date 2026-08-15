@@ -2,7 +2,7 @@ import request from "supertest";
 import { prismaMock } from "./prisma.mock";
 
 jest.mock("../src/middleware/auth.middleware", () => ({
-  protect: (req: any, res: any, next: any) => {
+  authenticate: (req: any, res: any, next: any) => {
     req.user = { id: "user-1", role: "UNIVERSITY_ADMIN", universityId: "uni-1" };
     next();
   }

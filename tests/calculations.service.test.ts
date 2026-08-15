@@ -85,7 +85,7 @@ describe("Calculation Service", () => {
 
     prismaMock.activityData.findUnique.mockResolvedValue(mockActivity);
 
-    await expect(calculateActivity("act-2")).rejects.toThrow("Only VERIFIED activities can be calculated");
+    await expect(calculateActivity("act-2")).rejects.toThrow("Only VERIFIED activity data can be calculated");
   });
 
   it("Test 3 - Should reject calculation for LOCKED reporting period", async () => {
@@ -101,6 +101,6 @@ describe("Calculation Service", () => {
 
     prismaMock.activityData.findUnique.mockResolvedValue(mockActivity);
 
-    await expect(calculateActivity("act-3")).rejects.toThrow("Cannot calculate activity in a LOCKED reporting period");
+    await expect(calculateActivity("act-3")).rejects.toThrow("Reporting period is locked");
   });
 });

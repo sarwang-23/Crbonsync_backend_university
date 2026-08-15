@@ -19,22 +19,11 @@ describe("Dashboard Service", () => {
       updatedAt: new Date()
     });
 
-    // Mock calculations aggregation
-    prismaMock.calculation.aggregate.mockResolvedValue({
-      _sum: {
-        co2eKg: 10000 // Total 10 tCO2e
-      },
-      _count: undefined,
-      _avg: undefined,
-      _min: undefined,
-      _max: undefined
-    });
-
-    // Mock scope breakdown
-    (prismaMock.calculation.groupBy as any).mockResolvedValue([
-      { scope: "SCOPE_1", _sum: { co2eKg: 4000 } },
-      { scope: "SCOPE_2", _sum: { co2eKg: 6000 } }
-    ]);
+    // Mock calculations findMany
+    prismaMock.calculation.findMany.mockResolvedValue([
+      { scope: "SCOPE_1", co2eKg: 4000 },
+      { scope: "SCOPE_2", co2eKg: 6000 }
+    ] as any);
 
     // Mock active buildings count
     prismaMock.building.count.mockResolvedValue(5);

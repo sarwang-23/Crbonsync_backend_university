@@ -33,6 +33,7 @@ import { targetsRouter } from "../../modules/targets/targets.routes";
 import { recommendationsRouter } from "../../modules/recommendations/recommendations.routes";
 import { universityStatisticsRouter } from "../../modules/universityStatistics/universityStatistics.routes";
 import { reportsRouter } from "../../modules/reports/reports.routes";
+import { usersRouter } from "../../modules/users/users.routes";
 
 import { authenticate } from "../../middleware/auth.middleware";
 
@@ -51,6 +52,7 @@ v1Router.use("/auth", authRouter);
 // Apply JWT authentication to all subsequent routes
 v1Router.use(authenticate);
 
+v1Router.use("/users", usersRouter);
 v1Router.use("/universities", universitiesRouter);
 v1Router.use("/campuses", campusesRouter);
 v1Router.use("/buildings", buildingsRouter);

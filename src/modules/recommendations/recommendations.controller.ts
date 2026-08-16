@@ -9,7 +9,25 @@ const querySchema = z.object({
 
 export const getRecommendations = catchAsync(async (req: Request, res: Response) => {
   const query = querySchema.parse(req.query);
-  const data = await recommendationsService.getRecommendations(query);
+  const priority = req.query.priority as string | undefined;
+  const category = req.query.category as string | undefined;
+  const status = req.query.status as string | undefined;
+
+  const data = await recommendationsService.getRecommendations({ ...query, priority, category, status });
+  res.status(200).json({ success: true, data });
+});
+
+export const getRecommendationById = catchAsync(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const data = await recommendationsService.getRecommendationById(id);
+  if (!data) return res.status(404).json({ success: false, message: "Recommendation not found" });
+  res.status(200).json({ success: true, data });
+});
+
+export const updateRecommendationStatus = catchAsync(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const { status } = req.body;
+  const data = await recommendationsService.updateRecommendationStatus(id, status);
   res.status(200).json({ success: true, data });
 });
 

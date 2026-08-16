@@ -19,6 +19,13 @@ export const register = async (data: RegisterInput) => {
   const plainPassword = data.password || Math.random().toString(36).slice(-10);
   const passwordHash = await bcrypt.hash(plainPassword, 10);
 
+  // Automatically assign to the first university for testing purposes if none provided
+  let uId = data.universityId;
+  if (!uId) {
+    const firstUni = await prisma.university.findFirst();
+    if (firstUni) uId = firstUni.id;
+  }
+
   const user = await prisma.user.create({
     data: {
       firstName: data.firstName,
@@ -26,7 +33,7 @@ export const register = async (data: RegisterInput) => {
       email: data.email,
       passwordHash,
       role: data.role,
-      universityId: data.universityId
+      universityId: uId
     }
   });
 

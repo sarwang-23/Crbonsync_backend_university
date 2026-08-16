@@ -10,8 +10,10 @@ import {
   getBaselineComparison,
   getIntensityMetrics,
   getRecentActivity,
+  getActivityStats,
   getTargets,
-  getGroupBreakdown
+  getGroupBreakdown,
+  getDefaultReportingPeriod
 } from "./dashboard.service";
 
 export const getSummary = async (req: Request, res: Response, next: NextFunction) => {
@@ -19,8 +21,12 @@ export const getSummary = async (req: Request, res: Response, next: NextFunction
     const universityId = req.query.universityId ? String(req.query.universityId) : "";
     if (!universityId) return res.status(400).json({ success: false, message: "universityId is required" });
     
-    const reportingPeriodId = req.query.reportingPeriodId ? String(req.query.reportingPeriodId) : "";
-    if (!reportingPeriodId) return res.status(400).json({ success: false, message: "reportingPeriodId is required for dashboard summary" });
+    let reportingPeriodId = req.query.reportingPeriodId ? String(req.query.reportingPeriodId) : "";
+    if (!reportingPeriodId) {
+      const defaultPeriod = await getDefaultReportingPeriod(universityId);
+      if (defaultPeriod) reportingPeriodId = defaultPeriod;
+      else return res.status(400).json({ success: false, message: "No active reporting period found for this university" });
+    }
     
     const [
       overview,
@@ -33,6 +39,7 @@ export const getSummary = async (req: Request, res: Response, next: NextFunction
       baseline,
       intensity,
       recentActivity,
+      activityStats,
       targets,
       groups
     ] = await Promise.all([
@@ -46,6 +53,7 @@ export const getSummary = async (req: Request, res: Response, next: NextFunction
       getBaselineComparison(universityId, reportingPeriodId),
       getIntensityMetrics(universityId, reportingPeriodId),
       getRecentActivity(universityId, reportingPeriodId),
+      getActivityStats(universityId, reportingPeriodId),
       getTargets(universityId),
       getGroupBreakdown(universityId, reportingPeriodId)
     ]);
@@ -63,6 +71,7 @@ export const getSummary = async (req: Request, res: Response, next: NextFunction
         baseline,
         intensity,
         recentActivity,
+        activityStats,
         targets,
         groups
         // Data quality could be pulled from dataQuality service if needed,

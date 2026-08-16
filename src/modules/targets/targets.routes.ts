@@ -6,6 +6,7 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get("/", targetsController.getTargets);
 router.post("/", targetsController.createTarget);
 router.get("/:id/progress", targetsController.getTargetProgress);
 

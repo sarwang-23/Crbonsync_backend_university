@@ -10,6 +10,8 @@ router.use(authenticate);
 
 router.get("/", validateRequest(getRecommendationsSchema, "query"), recommendationsController.getRecommendations);
 router.post("/generate", validateRequest(generateRecommendationsSchema, "body"), recommendationsController.generateRecommendations);
+router.get("/:id", recommendationsController.getRecommendationById);
+router.patch("/:id/status", recommendationsController.updateRecommendationStatus);
 
 const recommendationsRouter = router;
 export { recommendationsRouter };

@@ -86,6 +86,13 @@ export class TargetsService {
       progressPercent: Number(progressPercent.toFixed(2))
     };
   }
+
+  async getTargets(universityId: string) {
+    return prisma.sustainabilityTarget.findMany({
+      where: { universityId },
+      orderBy: { targetYear: 'asc' }
+    });
+  }
 }
 
 export const targetsService = new TargetsService();

@@ -1,5 +1,13 @@
 import { prisma } from "../../config/prisma";
 
+export const getDefaultReportingPeriod = async (universityId: string) => {
+  const period = await prisma.reportingPeriod.findFirst({
+    where: { universityId, status: { in: ["OPEN", "SUBMITTED", "VERIFIED", "LOCKED"] } },
+    orderBy: { endDate: 'desc' }
+  });
+  return period?.id || null;
+};
+
 export const getPreviousPeriodId = async (universityId: string, currentPeriodId?: string) => {
   if (!currentPeriodId) return null;
   const currentPeriod = await prisma.reportingPeriod.findUnique({ where: { id: currentPeriodId } });
@@ -97,6 +105,28 @@ export const getScopeBreakdown = async (universityId: string, reportingPeriodId?
     if (calculation.scope === "SCOPE_2") scope2Kg += calculation.co2eKg;
   }
 
+  let scope1Delta = 0;
+  let scope2Delta = 0;
+  if (reportingPeriodId) {
+    const prevPeriodId = await getPreviousPeriodId(universityId, reportingPeriodId);
+    if (prevPeriodId) {
+      const prevCalcs = await prisma.calculation.findMany({
+        where: { universityId, reportingPeriodId: prevPeriodId, status: "CALCULATED" },
+        select: { scope: true, co2eKg: true }
+      });
+      let prevScope1Kg = 0;
+      let prevScope2Kg = 0;
+      for (const calc of prevCalcs) {
+        if (calc.scope === "SCOPE_1") prevScope1Kg += calc.co2eKg;
+        if (calc.scope === "SCOPE_2") prevScope2Kg += calc.co2eKg;
+      }
+      if (prevScope1Kg > 0) scope1Delta = ((scope1Kg - prevScope1Kg) / prevScope1Kg) * 100;
+      else if (scope1Kg > 0 && prevScope1Kg === 0) scope1Delta = 100;
+      if (prevScope2Kg > 0) scope2Delta = ((scope2Kg - prevScope2Kg) / prevScope2Kg) * 100;
+      else if (scope2Kg > 0 && prevScope2Kg === 0) scope2Delta = 100;
+    }
+  }
+
   const totalKg = scope1Kg + scope2Kg;
 
   return {
@@ -104,11 +134,13 @@ export const getScopeBreakdown = async (universityId: string, reportingPeriodId?
       kgCO2e: scope1Kg,
       tonnesCO2e: scope1Kg / 1000,
       percentage: totalKg > 0 ? (scope1Kg / totalKg) * 100 : 0,
+      delta: Number(scope1Delta.toFixed(1))
     },
     scope2: {
       kgCO2e: scope2Kg,
       tonnesCO2e: scope2Kg / 1000,
       percentage: totalKg > 0 ? (scope2Kg / totalKg) * 100 : 0,
+      delta: Number(scope2Delta.toFixed(1))
     },
     total: {
       kgCO2e: totalKg,
@@ -354,6 +386,52 @@ export const getIntensityMetrics = async (universityId: string, reportingPeriodI
     totalAreaSqm,
     tonnesPerStudent: studentCount > 0 ? Number((totalTCO2e / studentCount).toFixed(4)) : 0,
     kgPerSqm: totalAreaSqm > 0 ? Number(((totalTCO2e * 1000) / totalAreaSqm).toFixed(2)) : 0
+  };
+};
+
+export const getActivityStats = async (universityId: string, reportingPeriodId?: string) => {
+  const where: any = { universityId };
+  if (reportingPeriodId) where.reportingPeriodId = reportingPeriodId;
+
+  const activities = await prisma.activityData.groupBy({
+    by: ['status'],
+    where,
+    _count: {
+      id: true
+    }
+  });
+
+  const stats = {
+    total: 0,
+    draft: 0,
+    submitted: 0,
+    underReview: 0,
+    verified: 0,
+    rejected: 0,
+    calculated: 0
+  };
+
+  activities.forEach((group: any) => {
+    const count = group._count.id;
+    stats.total += count;
+    if (group.status === "DRAFT") stats.draft = count;
+    else if (group.status === "SUBMITTED") stats.submitted = count;
+    else if (group.status === "UNDER_REVIEW") stats.underReview = count;
+    else if (group.status === "VERIFIED") stats.verified = count;
+    else if (group.status === "REJECTED") stats.rejected = count;
+    else if (group.status === "CALCULATED") stats.calculated = count;
+  });
+
+  // Calculate pending
+  const pending = stats.draft + stats.submitted + stats.underReview + stats.rejected;
+  
+  // Actually verified includes verified + calculated
+  const verifiedTotal = stats.verified + stats.calculated;
+
+  return {
+    ...stats,
+    pending,
+    verifiedTotal
   };
 };
 

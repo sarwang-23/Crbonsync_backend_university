@@ -16,3 +16,9 @@ export const getTargetProgress = catchAsync(async (req: Request, res: Response) 
   const result = await targetsService.getTargetProgress({ targetId, reportingPeriodId });
   res.status(200).json({ success: true, data: result });
 });
+
+export const getTargets = catchAsync(async (req: Request, res: Response) => {
+  const universityId = String(req.query.universityId);
+  const result = await targetsService.getTargets(universityId);
+  res.status(200).json({ success: true, data: result });
+});

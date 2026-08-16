@@ -11,14 +11,14 @@ export const createBaseline = async (data: any) => {
     where: {
       activityData: {
         reportingPeriodId: period.id,
-        status: "VERIFIED",
-        asset: { floor: { building: { campus: { universityId: data.universityId } } } }
+        status: { in: ["VERIFIED", "CALCULATED"] }
       }
     }
   });
 
   const scope1KgCO2e = calcs.filter((c: any) => c.scope === "SCOPE_1").reduce((sum: number, c: any) => sum + c.co2eKg, 0);
   const scope2KgCO2e = calcs.filter((c: any) => c.scope === "SCOPE_2").reduce((sum: number, c: any) => sum + c.co2eKg, 0);
+  const scope3KgCO2e = calcs.filter((c: any) => c.scope === "SCOPE_3").reduce((sum: number, c: any) => sum + c.co2eKg, 0);
 
   return prisma.baseline.create({
     data: {
@@ -29,7 +29,7 @@ export const createBaseline = async (data: any) => {
       notes: data.notes,
       scope1KgCO2e,
       scope2KgCO2e,
-      totalKgCO2e: scope1KgCO2e + scope2KgCO2e,
+      totalKgCO2e: scope1KgCO2e + scope2KgCO2e + scope3KgCO2e,
       status: "DRAFT"
     }
   });
@@ -94,29 +94,79 @@ export const getBaselineComparison = async (id: string) => {
     orderBy: { startDate: "desc" }
   });
 
-  let currentTotal = 0;
+  let currentCalcs: any[] = [];
   if (currentPeriod) {
-    const currentCalcs = await prisma.calculation.findMany({
+    currentCalcs = await prisma.calculation.findMany({
       where: {
         activityData: {
           reportingPeriodId: currentPeriod.id,
-          status: "VERIFIED"
+          status: { in: ["VERIFIED", "CALCULATED"] }
         }
+      },
+      include: {
+        activityData: true
       }
     });
-    const currentTotalScope1 = currentCalcs.filter((c: any) => c.scope === "SCOPE_1").reduce((sum: number, c: any) => sum + c.co2eKg, 0);
-    const currentTotalScope2 = currentCalcs.filter((c: any) => c.scope === "SCOPE_2").reduce((sum: number, c: any) => sum + c.co2eKg, 0);
-    currentTotal = currentTotalScope1 + currentTotalScope2;
   }
 
-  const baselineTotal = baseline.totalKgCO2e;
+  let baselineCalcs: any[] = [];
+  if (baseline.reportingPeriodId) {
+    baselineCalcs = await prisma.calculation.findMany({
+      where: {
+        activityData: {
+          reportingPeriodId: baseline.reportingPeriodId,
+          status: { in: ["VERIFIED", "CALCULATED"] }
+        }
+      },
+      include: {
+        activityData: true
+      }
+    });
+  }
+
+  // Calculate totals
+  const currentTotal = currentCalcs.reduce((sum, c) => sum + c.co2eKg, 0);
+  const baselineTotal = baseline.totalKgCO2e || baselineCalcs.reduce((sum, c) => sum + c.co2eKg, 0);
   const reduction = baselineTotal - currentTotal;
   const reductionPercent = baselineTotal > 0 ? (reduction / baselineTotal) * 100 : 0;
+
+  // Calculate scope breakdowns
+  const scopes = ["SCOPE_1", "SCOPE_2", "SCOPE_3"];
+  const scopeData = scopes.map(scope => {
+    const baseVal = baselineCalcs.filter(c => c.scope === scope).reduce((sum, c) => sum + c.co2eKg, 0);
+    const currVal = currentCalcs.filter(c => c.scope === scope).reduce((sum, c) => sum + c.co2eKg, 0);
+    const change = baseVal - currVal;
+    return {
+      scope,
+      baseline: baseVal / 1000,
+      current: currVal / 1000,
+      change: change / 1000,
+      changePercent: baseVal > 0 ? (change / baseVal) * 100 : 0
+    };
+  });
+
+  // Calculate category breakdowns
+  const categories = new Set([...baselineCalcs, ...currentCalcs].map(c => c.activityData.category));
+  const categoryData = Array.from(categories).map(category => {
+    const baseVal = baselineCalcs.filter(c => c.activityData.category === category).reduce((sum, c) => sum + c.co2eKg, 0);
+    const currVal = currentCalcs.filter(c => c.activityData.category === category).reduce((sum, c) => sum + c.co2eKg, 0);
+    const change = baseVal - currVal;
+    return {
+      category,
+      baseline: baseVal / 1000,
+      current: currVal / 1000,
+      change: change / 1000,
+      changePercent: baseVal > 0 ? (change / baseVal) * 100 : 0
+    };
+  }).sort((a, b) => b.baseline - a.baseline);
 
   return {
     baseline: baselineTotal / 1000,
     current: currentTotal / 1000,
     reduction: reduction / 1000,
-    reductionPercent: Number(reductionPercent.toFixed(2))
+    reductionPercent: Number(reductionPercent.toFixed(2)),
+    scopeData,
+    categoryData,
+    baselineYear: baseline.baselineYear
   };
 };

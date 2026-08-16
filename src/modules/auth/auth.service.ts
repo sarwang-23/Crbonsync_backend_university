@@ -15,10 +15,12 @@ export const register = async (data: RegisterInput) => {
     throw new Error("Email already registered");
   }
 
-  // Block privileged roles from public self-registration
+  // Block privileged roles from public self-registration unless valid adminSecret is provided
   const blockedRoles = ["SUPER_ADMIN", "UNIVERSITY_ADMIN"];
-  if (data.role && blockedRoles.includes(data.role)) {
-    throw new Error("Cannot self-register with a privileged role. Contact your administrator.");
+  const isValidSecret = data.adminSecret && data.adminSecret === (process.env.ADMIN_SECRET || "carbon_secret_2026");
+  
+  if (data.role && blockedRoles.includes(data.role) && !isValidSecret) {
+    throw new Error("Cannot self-register with a privileged role. Invalid or missing secret key.");
   }
 
   // Generate a random password if none provided (e.g., when an admin provisions an account)

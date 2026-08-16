@@ -5,8 +5,9 @@ export interface RegisterInput {
   lastName?: string;
   email: string;
   password?: string; // If left blank, a random one will be generated
-  role: UserRole;
+  role?: UserRole;
   universityId?: string;
+  adminSecret?: string;
 }
 
 export interface LoginInput {

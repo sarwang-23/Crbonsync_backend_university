@@ -6,8 +6,9 @@ export const registerSchema = z.object({
   lastName: z.string().optional(),
   email: z.string().email("Invalid email format"),
   password: z.string().min(8, "Password must be at least 8 characters").optional(),
-  role: z.nativeEnum(UserRole),
+  role: z.nativeEnum(UserRole).optional(),
   universityId: z.string().uuid("Invalid university ID").optional(),
+  adminSecret: z.string().optional(), // For bypassing privileged role blocks
 });
 
 export const loginSchema = z.object({

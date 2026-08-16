@@ -1,5 +1,21 @@
 import { prisma } from "../../config/prisma";
 
+export const getPreviousPeriodId = async (universityId: string, currentPeriodId?: string) => {
+  if (!currentPeriodId) return null;
+  const currentPeriod = await prisma.reportingPeriod.findUnique({ where: { id: currentPeriodId } });
+  if (!currentPeriod) return null;
+
+  const prevPeriod = await prisma.reportingPeriod.findFirst({
+    where: {
+      universityId,
+      endDate: { lte: currentPeriod.startDate },
+      status: { in: ["OPEN", "SUBMITTED", "VERIFIED", "LOCKED"] }
+    },
+    orderBy: { endDate: 'desc' }
+  });
+  return prevPeriod?.id || null;
+};
+
 export const getOverview = async (universityId: string, reportingPeriodId?: string) => {
   const where: any = { universityId, status: "CALCULATED" };
   if (reportingPeriodId) where.reportingPeriodId = reportingPeriodId;
@@ -40,11 +56,27 @@ export const getOverview = async (universityId: string, reportingPeriodId?: stri
     }
   }
 
+  // Calculate delta compared to previous period
+  let delta = 0;
+  if (reportingPeriodId) {
+    const prevPeriodId = await getPreviousPeriodId(universityId, reportingPeriodId);
+    if (prevPeriodId) {
+      const prevCalcs = await prisma.calculation.findMany({
+        where: { universityId, reportingPeriodId: prevPeriodId, status: "CALCULATED" }
+      });
+      const prevTotalKg = prevCalcs.reduce((sum, c) => sum + c.co2eKg, 0);
+      if (prevTotalKg > 0) {
+        delta = ((totalKg - prevTotalKg) / prevTotalKg) * 100;
+      }
+    }
+  }
+
   return {
     totalEmissionsTonnes: totalKg / 1000,
     scope1Tonnes: scope1Kg / 1000,
     scope2Tonnes: scope2Kg / 1000,
-    reductionPercentage: Number(reductionPercentage.toFixed(2))
+    reductionPercentage: Number(reductionPercentage.toFixed(2)),
+    delta: Number(delta.toFixed(2))
   };
 };
 
@@ -108,12 +140,36 @@ export const getCategoryBreakdown = async (universityId: string, reportingPeriod
     result[category].kgCO2e += calculation.co2eKg;
   }
 
-  return Object.entries(result).map(([category, value]) => ({
-    category,
-    scope: value.scope,
-    kgCO2e: value.kgCO2e,
-    tonnesCO2e: value.kgCO2e / 1000,
-  }));
+  let prevResult: Record<string, number> = {};
+  if (reportingPeriodId) {
+    const prevPeriodId = await getPreviousPeriodId(universityId, reportingPeriodId);
+    if (prevPeriodId) {
+      const prevCalcs = await prisma.calculation.findMany({
+        where: { universityId, reportingPeriodId: prevPeriodId, status: "CALCULATED" },
+        include: { activityData: { select: { category: true } } }
+      });
+      for (const calculation of prevCalcs) {
+        const category = calculation.activityData.category;
+        if (!prevResult[category]) prevResult[category] = 0;
+        prevResult[category] += calculation.co2eKg;
+      }
+    }
+  }
+
+  return Object.entries(result).map(([category, value]) => {
+    const prevKg = prevResult[category] || 0;
+    let trend = 0;
+    if (prevKg > 0) trend = ((value.kgCO2e - prevKg) / prevKg) * 100;
+    else if (value.kgCO2e > 0 && prevKg === 0) trend = 100;
+
+    return {
+      category,
+      scope: value.scope,
+      kgCO2e: value.kgCO2e,
+      tonnesCO2e: value.kgCO2e / 1000,
+      trend: Number(trend.toFixed(1))
+    };
+  });
 };
 
 export const getTopSources = async (universityId: string, reportingPeriodId?: string) => {
@@ -299,4 +355,102 @@ export const getIntensityMetrics = async (universityId: string, reportingPeriodI
     tonnesPerStudent: studentCount > 0 ? Number((totalTCO2e / studentCount).toFixed(4)) : 0,
     kgPerSqm: totalAreaSqm > 0 ? Number(((totalTCO2e * 1000) / totalAreaSqm).toFixed(2)) : 0
   };
+};
+
+export const getRecentActivity = async (universityId: string, reportingPeriodId?: string) => {
+  const where: any = { universityId };
+  if (reportingPeriodId) where.reportingPeriodId = reportingPeriodId;
+
+  const activities = await prisma.activityData.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    take: 6
+  });
+
+  return activities.map(a => {
+    let statusText = "Synced";
+    if (a.status === "UNDER_REVIEW") statusText = "Needs review";
+    else if (a.status === "CALCULATED" || a.status === "VERIFIED") statusText = "Processed";
+
+    return {
+      source: a.sourceFileName || a.description || `Record ${a.category}`,
+      type: a.category.replace(/_/g, ' ').toLowerCase(),
+      scope: a.scope === "SCOPE_1" ? "S1" : a.scope === "SCOPE_2" ? "S2" : "S3",
+      value: `${a.quantity} ${a.unit}`,
+      status: statusText
+    };
+  });
+};
+
+export const getTargets = async (universityId: string) => {
+  const targets = await prisma.sustainabilityTarget.findMany({
+    where: { universityId },
+    orderBy: { targetYear: 'asc' }
+  });
+
+  const baseline = await prisma.baseline.findFirst({
+    where: { universityId }
+  });
+
+  const formattedTargets = [];
+  if (baseline) {
+    formattedTargets.push({
+      label: `${baseline.baselineYear} baseline`,
+      value: Math.round(baseline.totalKgCO2e / 1000),
+      unit: "tCO₂e",
+      complete: false
+    });
+  }
+
+  for (const t of targets) {
+    formattedTargets.push({
+      label: `${t.targetYear} target (-${t.reductionPct}%)`,
+      value: t.targetCo2eKg ? Math.round(t.targetCo2eKg / 1000) : 0,
+      unit: "tCO₂e",
+      complete: false
+    });
+  }
+
+  return formattedTargets;
+};
+
+export const getGroupBreakdown = async (universityId: string, reportingPeriodId?: string) => {
+  const categories = await getCategoryBreakdown(universityId, reportingPeriodId);
+  const totalTonnes = categories.reduce((sum, c) => sum + c.tonnesCO2e, 0);
+
+  const groups = [
+    { key: "offices", name: "Offices", icon: "building", value: 0, description: "Energy, water and waste from the owned and leased offices.", items: [] as any[] },
+    { key: "logistics", name: "Logistics", icon: "truck", value: 0, description: "Freight, first- and last-mile movement of goods.", items: [] as any[] },
+    { key: "travel", name: "Travel", icon: "airplane", value: 0, description: "Employee business travel across flights, rail, hotels and rental cars.", items: [] as any[] },
+    { key: "employees", name: "Employees", icon: "users", value: 0, description: "Commuting, remote work energy and employee-owned equipment.", items: [] as any[] },
+    { key: "supply-chain", name: "Supply chain", icon: "factory", value: 0, description: "Upstream and downstream emissions across the value chain.", items: [] as any[] }
+  ];
+
+  for (const cat of categories) {
+    const scopeStr = cat.scope === "SCOPE_1" ? "S1" : cat.scope === "SCOPE_2" ? "S2" : "S3";
+    const item = { name: cat.category.replace(/_/g, ' ').toLowerCase(), value: Math.round(cat.tonnesCO2e), scope: scopeStr, trend: cat.trend };
+    
+    // Ignore scope 3 heavily but place scope 1/2 in correct buckets
+    if (["PURCHASED_ELECTRICITY", "PURCHASED_HEATING", "PURCHASED_COOLING", "PURCHASED_STEAM", "NATURAL_GAS", "BOILER_FUEL", "GENERATOR_FUEL"].includes(cat.category)) {
+      groups[0].value += cat.tonnesCO2e;
+      groups[0].items.push(item);
+    } else if (["DIESEL", "PETROL", "CNG", "OWNED_VEHICLE"].includes(cat.category)) {
+      groups[1].value += cat.tonnesCO2e;
+      groups[1].items.push(item);
+    } else {
+      groups[0].value += cat.tonnesCO2e;
+      groups[0].items.push(item);
+    }
+  }
+
+  return groups.map(g => {
+    let avgTrend = g.items.length ? g.items.reduce((sum, i) => sum + i.trend, 0) / g.items.length : 0;
+    return {
+      ...g,
+      value: Math.round(g.value),
+      share: totalTonnes > 0 ? Number((g.value / totalTonnes).toFixed(2)) : 0,
+      delta: Number(avgTrend.toFixed(1)),
+      spark: []
+    };
+  }).sort((a, b) => b.value - a.value);
 };

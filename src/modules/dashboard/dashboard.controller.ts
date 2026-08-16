@@ -8,7 +8,10 @@ import {
   getFloorEmissions,
   getMonthlyTrends,
   getBaselineComparison,
-  getIntensityMetrics
+  getIntensityMetrics,
+  getRecentActivity,
+  getTargets,
+  getGroupBreakdown
 } from "./dashboard.service";
 
 export const getSummary = async (req: Request, res: Response, next: NextFunction) => {
@@ -28,7 +31,10 @@ export const getSummary = async (req: Request, res: Response, next: NextFunction
       floors,
       trends,
       baseline,
-      intensity
+      intensity,
+      recentActivity,
+      targets,
+      groups
     ] = await Promise.all([
       getOverview(universityId, reportingPeriodId),
       getScopeBreakdown(universityId, reportingPeriodId),
@@ -38,7 +44,10 @@ export const getSummary = async (req: Request, res: Response, next: NextFunction
       getFloorEmissions(universityId, reportingPeriodId),
       getMonthlyTrends(universityId, reportingPeriodId),
       getBaselineComparison(universityId, reportingPeriodId),
-      getIntensityMetrics(universityId, reportingPeriodId)
+      getIntensityMetrics(universityId, reportingPeriodId),
+      getRecentActivity(universityId, reportingPeriodId),
+      getTargets(universityId),
+      getGroupBreakdown(universityId, reportingPeriodId)
     ]);
 
     return res.status(200).json({
@@ -53,6 +62,9 @@ export const getSummary = async (req: Request, res: Response, next: NextFunction
         trends,
         baseline,
         intensity,
+        recentActivity,
+        targets,
+        groups
         // Data quality could be pulled from dataQuality service if needed,
         // but skipping here to avoid circular deps or complex imports.
       }

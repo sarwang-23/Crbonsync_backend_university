@@ -36,6 +36,7 @@ import { reportsRouter } from "../../modules/reports/reports.routes";
 import { usersRouter } from "../../modules/users/users.routes";
 
 import { authenticate } from "../../middleware/auth.middleware";
+import { authorize } from "../../middleware/rbac.middleware";
 
 const v1Router = Router();
 
@@ -60,12 +61,12 @@ v1Router.use("/floors", floorsRouter);
 v1Router.use("/assets", assetsRouter);
 v1Router.use("/imports", importsRouter);
 v1Router.use("/activity-data", activityDataRouter);
-v1Router.use("/emission-factors", emissionFactorsRouter);
+v1Router.use("/emission-factors", authorize(["SUPER_ADMIN", "UNIVERSITY_ADMIN", "SUSTAINABILITY_MANAGER"]), emissionFactorsRouter);
 v1Router.use("/calculations", calculationsRouter);
 v1Router.use("/baselines", baselinesRouter);
 v1Router.use("/dashboard", dashboardRouter);
 v1Router.use("/data-quality", dataQualityRouter);
-v1Router.use("/audit-logs", auditLogsRouter);
+v1Router.use("/audit-logs", authorize(["SUPER_ADMIN", "AUDITOR", "UNIVERSITY_ADMIN"]), auditLogsRouter);
 v1Router.use("/documents", documentsRouter);
 v1Router.use("/notifications", notificationsRouter);
 v1Router.use("/reporting-periods", reportingPeriodsRouter);

@@ -71,3 +71,14 @@ export const updateUser = async (id: string, data: {
   await logEvent("UPDATE", "User", user.id, adminId, universityId, oldUser, user, "Updated user details");
   return user;
 };
+export const deleteUser = async (id: string, adminId: string, universityId: string) => {
+  const user = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true, universityId: true } });
+  if (!user) throw new Error("User not found");
+
+  // Cannot delete SUPER_ADMIN
+  if (user.role === "SUPER_ADMIN") throw new Error("Cannot delete a SUPER_ADMIN account");
+
+  await logEvent("DELETE", "User", id, adminId, universityId, user, null, "Deleted user");
+  await prisma.user.delete({ where: { id } });
+  return { message: "User deleted successfully" };
+};

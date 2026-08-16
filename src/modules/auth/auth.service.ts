@@ -15,6 +15,12 @@ export const register = async (data: RegisterInput) => {
     throw new Error("Email already registered");
   }
 
+  // Block privileged roles from public self-registration
+  const blockedRoles = ["SUPER_ADMIN", "UNIVERSITY_ADMIN"];
+  if (data.role && blockedRoles.includes(data.role)) {
+    throw new Error("Cannot self-register with a privileged role. Contact your administrator.");
+  }
+
   // Generate a random password if none provided (e.g., when an admin provisions an account)
   const plainPassword = data.password || Math.random().toString(36).slice(-10);
   const passwordHash = await bcrypt.hash(plainPassword, 10);
@@ -32,7 +38,7 @@ export const register = async (data: RegisterInput) => {
       lastName: data.lastName,
       email: data.email,
       passwordHash,
-      role: data.role,
+      role: data.role || "USER",  // Default to USER for public signups
       universityId: uId
     }
   });

@@ -22,6 +22,7 @@ enum UserRole {
   REVIEWER
   AUDITOR
   MANAGEMENT
+  USER
 }
 
 enum UniversityStatus {
@@ -69,7 +70,7 @@ model User {
   lastName     String?
   email        String     @unique
   passwordHash String
-  role         UserRole   @default(DATA_ENTRY)
+  role         UserRole   @default(USER)
   status       UserStatus @default(ACTIVE)
 
   universityId       String?
